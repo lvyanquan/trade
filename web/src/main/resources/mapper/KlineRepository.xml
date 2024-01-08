@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+        <!DOCTYPE mapper
+                PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+                "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.web_kline.datasource.repository.KlineRepository">
+<select id="findByTime" resultType="com.example.web_kline.datasource.entity.Kline">
+    select * from trade.kline  where open >  #{open} and symbol = #{symbol} and `interval` = #{interval} order by open limit #{limit}
+</select>
+</mapper>
