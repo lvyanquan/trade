@@ -23,6 +23,7 @@ import java.sql.Timestamp;
 import java.util.Map;
 
 public class PriceBean {
+    private long openTime;
     private long endTime;
     private BigDecimal open;
     private BigDecimal high;
@@ -32,7 +33,8 @@ public class PriceBean {
 
 
     //后续可以使用builder模式
-    public PriceBean(long endTime, BigDecimal open, BigDecimal high, BigDecimal low, BigDecimal close,BigDecimal volume) {
+    public PriceBean(long openTime, long endTime, BigDecimal open, BigDecimal high, BigDecimal low, BigDecimal close,BigDecimal volume) {
+      this.openTime = openTime;
         this.endTime = endTime;
         this.open = open;
         this.high = high;
@@ -90,9 +92,19 @@ public class PriceBean {
         this.volume = volume;
     }
 
+    public long getOpenTime() {
+        return openTime;
+    }
+
+    public void setOpenTime(long openTime) {
+        this.openTime = openTime;
+    }
+
     @Override
     public String toString() {
         return "PriceBean{" +
+                "openTime=" + openTime +
+                "openTime=" + new Timestamp(openTime) +
                 "endTime=" + endTime +
                 "endTime=" + new Timestamp(endTime) +
                 ", open=" + open +

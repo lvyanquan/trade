@@ -21,6 +21,7 @@ package org.example.data.currency;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import org.example.util.JsonUtil;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,9 @@ public class CurrencyRegister {
 
     }
 
+    public static Collection<Currency> currencys(){
+      return CURRENCY_HASH_MAP.values();
+    }
     private static void register(Currency currency) {
         CURRENCY_HASH_MAP.put(currency.symbol(), currency);
     }

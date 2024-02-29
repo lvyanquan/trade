@@ -60,14 +60,16 @@ public class KlineUtil {
 
         lists.forEach(i -> {
             List<Object> data = (List<Object>) i;
+            long openTime = Long.parseLong(data.get(0).toString());
             long closeTime = Long.parseLong(data.get(6).toString());
+
             BigDecimal o = BigDecimal.valueOf(Double.parseDouble(data.get(1).toString()));
             BigDecimal h = BigDecimal.valueOf(Double.parseDouble(data.get(2).toString()));
             BigDecimal l = BigDecimal.valueOf(Double.parseDouble(data.get(3).toString()));
             BigDecimal c = BigDecimal.valueOf(Double.parseDouble(data.get(4).toString()));
             BigDecimal v = BigDecimal.valueOf(Double.parseDouble(data.get(5).toString()));
 
-            priceBeans.add(new PriceBean(closeTime, o, h, l, c, v));
+            priceBeans.add(new PriceBean(openTime,closeTime, o, h, l, c, v));
 
         });
 
@@ -98,6 +100,7 @@ public class KlineUtil {
 
         lists.forEach(i -> {
             List<Object> data = (List<Object>) i;
+            long openTime = Long.parseLong(data.get(0).toString());
             long closeTime = Long.parseLong(data.get(6).toString());
             BigDecimal o = BigDecimal.valueOf(Double.parseDouble(data.get(1).toString()));
             BigDecimal h = BigDecimal.valueOf(Double.parseDouble(data.get(2).toString()));
@@ -105,7 +108,7 @@ public class KlineUtil {
             BigDecimal c = BigDecimal.valueOf(Double.parseDouble(data.get(4).toString()));
             BigDecimal v = BigDecimal.valueOf(Double.parseDouble(data.get(5).toString()));
 
-            priceBeans.add(new PriceBean(closeTime, o, h, l, c, v));
+            priceBeans.add(new PriceBean(openTime,closeTime, o, h, l, c, v));
 
         });
 

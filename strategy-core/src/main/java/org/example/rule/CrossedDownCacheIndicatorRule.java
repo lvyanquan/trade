@@ -28,10 +28,19 @@ public class CrossedDownCacheIndicatorRule extends CrossedDownIndicatorRule {
     private int index;
     private Indicator<Num> first;
     private Indicator<Num> second;
+    private int continueEffective;
     public CrossedDownCacheIndicatorRule(Indicator<Num> first, Indicator<Num> second) {
         super(first, second);
         this.first = first;
         this.second = second;
+        this.continueEffective = 4;
+    }
+
+    public CrossedDownCacheIndicatorRule(Indicator<Num> first, Indicator<Num> second, int continueEffective) {
+        super(first, second);
+        this.first = first;
+        this.second = second;
+        this.continueEffective = continueEffective;
     }
     public boolean isSatisfied(int index, TradingRecord tradingRecord) {
         boolean satisfied = super.isSatisfied(index, tradingRecord);
@@ -40,7 +49,7 @@ public class CrossedDownCacheIndicatorRule extends CrossedDownIndicatorRule {
             this.index = index;
             return isCross;
         }
-        if(((Num)this.first.getValue(index)).isLessThan((Num)this.second.getValue(index)) && isCross && index-this.index <4){
+        if(((Num)this.first.getValue(index)).isLessThan((Num)this.second.getValue(index)) && isCross && index-this.index <continueEffective){
             return true;
         }
         return false;

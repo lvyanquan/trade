@@ -128,7 +128,7 @@ public class CollectRuleStrategyTest {
                 WeightRuleWrapper weightBollingExitWrapper = new WeightRuleWrapper("布林带宽度指标达到上轨退出", 3, bollingExit);
 
 
-                WeightRuleWrapper atrUper = new WeightRuleWrapper("3atr止盈", 3, new AtrOrderPriceRule(atrIndicator, closePrice,3));
+                WeightRuleWrapper atrUper = new WeightRuleWrapper("3atr止盈", 3, new AtrOrderPriceRule(atrIndicator, closePrice, 3));
 
                 //https://school.stockcharts.com/doku.php?id=technical_indicators:chandelier_exit  最近10日最高价减去3个atr单位
                 NumericIndicator chandelier_exit = NumericIndicator.of(new HighestValueIndicator(new HighPriceIndicator(series), 10))
@@ -137,7 +137,6 @@ public class CollectRuleStrategyTest {
 
 
                 WeightRuleWrapper exitTimeRule = new WeightRuleWrapper("30根k线盈利不到0.4.止盈", 3, new ExitTimeRule(30, 0.004, closePrice));
-
 
 
                 Rule macdDeathCross = new CrossedDownCacheIndicatorRule(emaIndicator7, eemaIndicator25);
@@ -199,8 +198,6 @@ public class CollectRuleStrategyTest {
                 exitTargets.add(5);
                 exitTargets.add(4);
 //                exitTargets.add(3);
-//                exitTargets.add(2);
-//                exitTargets.add(1);
                 exitTargets.add(6);
                 exitTargets.add(7);
                 exitTargets.add(8);
@@ -209,15 +206,22 @@ public class CollectRuleStrategyTest {
             }
         };
 
+        test("PYTHUSDT", "15m", 800, false, strateFactory);
+        Thread.sleep(10000);
+        test("SUIUSDT", "15m", 800, false, strateFactory);
+        Thread.sleep(10000);
+        test("BNTUSDT", "15m", 1000, false, strateFactory);
+    }
+
+    private static void test(String currency, String interval, int amount, boolean mock, StrateFactory strateFactory) {
         new Thread(() -> {
             //BTCUSDT_240329
-            CurrencyRegister.getCurrency("BTCUSDT_240329").ifPresent(i -> {
+            CurrencyRegister.getCurrency(currency).ifPresent(i -> {
                 AtomicBoolean running = new AtomicBoolean(false);
                 while (true) {
                     if (running.compareAndSet(false, true)) {
                         try {
-                            String interval = "15m";
-                            TraderTemplate test = new TraderTemplate(false, Trade.TradeType.BUY, 1200, interval, i, strateFactory, 0.0002);
+                            TraderTemplate test = new TraderTemplate(mock, Trade.TradeType.BUY, amount, interval, i, strateFactory, 0.0002);
                             test.test(interval);
                         } catch (Exception e1) {
                             System.out.println("----" + e1);
@@ -228,9 +232,6 @@ public class CollectRuleStrategyTest {
                 }
             });
         }).start();
-
-
-        Thread.currentThread().join();
     }
 
 

@@ -21,12 +21,18 @@ package com.example.web_kline.test2;
 import com.binance.connector.client.impl.SpotClientImpl;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
+import com.dingtalk.api.DefaultDingTalkClient;
+import com.dingtalk.api.DingTalkClient;
+import com.dingtalk.api.request.OapiRobotSendRequest;
 import com.example.web_kline.Order.OrderContext;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taobao.api.ApiException;
+import com.taobao.api.TaobaoResponse;
+import org.apache.commons.codec.binary.Base64;
 import org.example.BinanceKlineClient;
 import org.example.StrateFactory;
 import org.example.data.PriceBean;
@@ -47,8 +53,11 @@ import org.ta4j.core.analysis.cost.FixedTransactionCostModel;
 import org.ta4j.core.analysis.cost.ZeroCostModel;
 import org.ta4j.core.num.DoubleNum;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
@@ -104,6 +113,8 @@ public class TraderTemplate {
 
     Thread thread;
 
+    private boolean init = true;
+
     public TraderTemplate(boolean mock, Trade.TradeType tradeType, int amount, String interval, Currency currency, StrateFactory strategy, double range) {
         this.range2 = range;
         this.amount = amount;
@@ -121,16 +132,14 @@ public class TraderTemplate {
 //        }
 //        this.tradetest = tradetest;
 
-        this.orderContext = new OrderContext(2, 1200, tradeType, currency,false);
+        this.orderContext = new OrderContext(2, amount, tradeType, currency, false);
         this.series = new BaseBarSeries("mySeries", DoubleNum::valueOf);
         this.strategy = strategy.buildStrategy(series);
-        if (mock) {
-            loadHistory = false;
-        }
+        loadHistory = true;
         this.mock = mock;
         loadHistory();
         loadHistory = false;
-        this.orderContext = new OrderContext(2, 1200, tradeType, currency,true);
+        this.orderContext = new OrderContext(2, amount, tradeType, currency, mock);
         System.out.println("历史数据加载结束 " + lastBar);
     }
 
@@ -195,15 +204,19 @@ public class TraderTemplate {
         }
 
         if (strategy instanceof CollectRuleStrategy) {
-            System.out.println("newBar："+newBar+" 当前入场有效策略 " + ((CollectRuleStrategy) strategy).getEnterEffectiveRuleName()
+            System.out.println(currency.symbol() + " newBar：" + newBar + " 当前入场有效策略 " + ((CollectRuleStrategy) strategy).getEnterEffectiveRuleName()
                     + "入场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
+            if (((CollectRuleStrategy) strategy).getEffectiveWeight() > 2 && !loadHistory) {
+                sendMessageWebhook(currency.symbol() + " newBar：" + newBar + " 当前入场有效策略 " + ((CollectRuleStrategy) strategy).getEnterEffectiveRuleName()
+                        + "入场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
+            }
         }
 
-        for (TradingRecord tradingRecord : orderContext.exit(endIndex, newBar,strategy)) {
+        for (TradingRecord tradingRecord : orderContext.exit(endIndex, newBar, strategy)) {
 
             Trade exit = tradingRecord.getLastExit();
             Trade entry = tradingRecord.getLastEntry();
-            System.out.println("Exit on " + exit.getIndex() + "[" + newBar + "]" + " (price=" + exit.getNetPrice().doubleValue()
+            System.out.println(currency.symbol() + "Exit on " + exit.getIndex() + "[" + newBar + "]" + " (price=" + exit.getNetPrice().doubleValue()
                     + ", amount=" + exit.getAmount().doubleValue() + ")");
             if (!loadHistory && !mock) {
 //                orderLimitPingDuo(entry.getNetPrice().doubleValue() + range2);
@@ -213,12 +226,18 @@ public class TraderTemplate {
             if (strategy instanceof CollectRuleStrategy) {
                 System.out.println("离场有效策略 " + ((CollectRuleStrategy) strategy).getExitEffectiveRuleName()
                         + "离场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
+
+                if( !loadHistory && ((CollectRuleStrategy) strategy).getEffectiveWeight() > 2){
+                    sendMessageWebhook(currency+" 离场有效策略 " + ((CollectRuleStrategy) strategy).getExitEffectiveRuleName()
+                            + "离场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
+                }
+
             }
 
             Position position = tradingRecord.getLastPosition();
             if (position != null && this.position != position) {
                 this.position = tradingRecord.getLastPosition();
-                double v = calcitePosition(position) * 0.9998 *( position.getEntry().getAmount().doubleValue());
+                double v = calcitePosition(position) * 0.9998 * (position.getEntry().getAmount().doubleValue());
                 profit += v;
                 System.out.println("本次盈利 " + v + " 一共盈利" + profit);
                 if (v < 0) {
@@ -232,7 +251,7 @@ public class TraderTemplate {
 
 
         if (strategy instanceof CollectRuleStrategy) {
-            System.out.println("newBar："+newBar+"当前离场有效策略 " + ((CollectRuleStrategy) strategy).getExitEffectiveRuleName()
+            System.out.println("newBar：" + newBar + "当前离场有效策略 " + ((CollectRuleStrategy) strategy).getExitEffectiveRuleName()
                     + "离场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
         }
 
@@ -324,8 +343,8 @@ public class TraderTemplate {
                 parameters.put("positionSide", "long");
                 parameters.put("type", "LIMIT");
                 parameters.put("timeInForce", "GTC");
-                parameters.put("quantity",BigDecimal.valueOf(amount).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                parameters.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), 1));
+                parameters.put("quantity", BigDecimal.valueOf(amount).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN).doubleValue());
+                parameters.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), RoundingMode.DOWN).doubleValue());
                 String result = client.account().newOrder(parameters);
                 System.out.println("买入订单信息：" + result);
                 break;
@@ -335,7 +354,7 @@ public class TraderTemplate {
         }
     }
 
-    protected void orderLimitPingDuo(double price,double amount) {
+    protected void orderLimitPingDuo(double price, double amount) {
         for (int i = 0; i < 3; i++) {
             try {
                 LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
@@ -345,8 +364,8 @@ public class TraderTemplate {
                 parameters3.put("positionSide", "long");
                 parameters3.put("type", "LIMIT");
                 parameters3.put("timeInForce", "GTC");
-                parameters3.put("quantity", BigDecimal.valueOf(amount).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                parameters3.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(),  RoundingMode.DOWN));
+                parameters3.put("quantity", BigDecimal.valueOf(amount).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN).doubleValue());
+                parameters3.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), RoundingMode.DOWN).doubleValue());
                 String result = client.account().newOrder(parameters3);
                 System.out.println("平多单" + result);
                 break;
@@ -366,7 +385,7 @@ public class TraderTemplate {
                 parameters.put("type", "LIMIT");
                 parameters.put("timeInForce", "GTC");
                 parameters.put("quantity", BigDecimal.valueOf(amount / price).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                parameters.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(),  RoundingMode.DOWN));
+                parameters.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), RoundingMode.DOWN));
                 String result = client.account().newOrder(parameters);
                 System.out.println("买入订单信息：" + result);
                 break;
@@ -504,7 +523,7 @@ public class TraderTemplate {
                         List o = (List) data.get(data.size() - 4);
                         double v = Double.parseDouble(o.get(0).toString());
                         if (v - order.getPrice() < 0) {
-                            orderLimitDuo(v * (1-range2), order.amount);
+                            orderLimitDuo(v * (1 - range2), order.amount);
                             queue.remove(order);
                             System.out.println(simpleDateFormat.format(new Date()) + "开多单, 价格:" + (v - range2));
                         }
@@ -514,7 +533,7 @@ public class TraderTemplate {
                         List o = (List) data.get(3);
                         double v = Double.parseDouble(o.get(0).toString());
                         if (v - order.getPrice() > 0) {
-                            orderLimitPingDuo(v * (1+range2),order.amount);
+                            orderLimitPingDuo(v * (1 + range2), order.amount);
                             queue.remove(order);
                             System.out.println(simpleDateFormat.format(new Date()) + "平多单, 价格:" + (v + range2));
                         }
@@ -555,6 +574,41 @@ public class TraderTemplate {
 
         public double getAmount() {
             return amount;
+        }
+    }
+
+    public String getDIndinUrl() {
+        try {
+            String url = "https://oapi.dingtalk.com/robot/send?access_token=793336df0ed161c1b9c082e7ff22ed360a2a1d3730fad8a753826ecc77a3d107";
+            Long timestamp = System.currentTimeMillis();
+            String secret = "SEC565e84ba79af6dc34b977b08a7b7bca1669f394ed36b7e1f2da377b6ff22195d";
+
+            String stringToSign = timestamp + "\n" + secret;
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes("UTF-8"), "HmacSHA256"));
+            byte[] signData = mac.doFinal(stringToSign.getBytes("UTF-8"));
+            String sign = URLEncoder.encode(new String(Base64.encodeBase64(signData)), "UTF-8");
+            return url + "&timestamp=" + timestamp + "&sign=" + sign;
+
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public void sendMessageWebhook(String msg) {
+        try {
+            DingTalkClient client = new DefaultDingTalkClient(getDIndinUrl());
+            OapiRobotSendRequest request = new OapiRobotSendRequest();
+            request.setMsgtype("text");
+            OapiRobotSendRequest.Text text = new OapiRobotSendRequest.Text();
+            text.setContent(msg);
+            request.setText(text);
+            OapiRobotSendRequest.At at = new OapiRobotSendRequest.At();
+            at.setIsAtAll(false);
+            request.setAt(at);
+            TaobaoResponse response = client.execute(request);
+            System.out.println(response.getBody());
+        } catch (Exception e) {
         }
     }
 }

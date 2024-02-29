@@ -30,7 +30,7 @@ import java.util.function.Consumer;
 
 public class BinanceKlineClient implements KlineClient {
 
-    private  UMWebsocketClientImpl client = new UMWebsocketClientImpl();
+    private UMWebsocketClientImpl client = new UMWebsocketClientImpl();
     private final Map<String, Integer> connectionCache = new HashMap<>();
 
     private final Set<String> historySyncSymbols = new HashSet<>();
@@ -43,19 +43,18 @@ public class BinanceKlineClient implements KlineClient {
             }
             int connectionId = client.klineStream(symbol, interval,
                     msg -> {
-                        System.out.println("123" + msg);
                     }, event -> callback.accept(event)
                     , msg -> {
-                        System.out.println("abc" + msg);
+                        System.out.println("关闭连接" + msg);
+                        this.unSubscribe(symbol, interval);
                     }, msg -> {
                         System.out.println("出现异常,重新连接" + msg);
-                        this.unSubscribe(symbol,interval);
-                        this.client = new UMWebsocketClientImpl();
                         try {
-                            Thread.sleep(30000L);
+                            Thread.sleep(5000L);
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
+                        this.unSubscribe(symbol, interval);
                         this.subscribe(symbol, interval, callback);
                     });
             connectionCache.put(symbol + "_" + interval, connectionId);
@@ -74,7 +73,9 @@ public class BinanceKlineClient implements KlineClient {
     public void unSubscribe(String symbol, String interval) {
         synchronized (connectionCache) {
             Integer connectionId = connectionCache.remove(symbol + "_" + interval);
-            client.closeConnection(connectionId);
+            if (connectionId != null) {
+                client.closeConnection(connectionId);
+            }
         }
     }
 }
