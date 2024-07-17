@@ -18,7 +18,7 @@
 
 package com.example.web_kline.util;
 
-import org.example.enums.OrderSide;
+import org.example.model.enums.OrderSide;
 
 public class BinanceOrderUtil {
 

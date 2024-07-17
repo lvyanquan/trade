@@ -18,55 +18,44 @@
 
 package com.example.web_kline.test2;
 
-import com.binance.connector.client.impl.SpotClientImpl;
-import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
-import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
 import com.dingtalk.api.DefaultDingTalkClient;
 import com.dingtalk.api.DingTalkClient;
 import com.dingtalk.api.request.OapiRobotSendRequest;
 import com.example.web_kline.Order.OrderContext;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.taobao.api.ApiException;
 import com.taobao.api.TaobaoResponse;
 import org.apache.commons.codec.binary.Base64;
-import org.example.BinanceKlineClient;
 import org.example.StrateFactory;
-import org.example.data.PriceBean;
-import org.example.data.currency.Currency;
-import org.example.enums.OrderSide;
+import org.example.binance.factory.KlineFactory;
+import org.example.kline.KlineClient;
+import org.example.model.currency.Currency;
+import org.example.model.enums.OrderSide;
+import org.example.model.enums.Server;
+import org.example.model.enums.ContractType;
+import org.example.model.market.KlineModule;
 import org.example.strategy.CollectRuleStrategy;
-import org.example.util.JsonUtil;
-import org.example.util.KlineUtil;
+import org.example.trade.TradeClient;
+import org.example.trade.TradeClientFactory;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBar;
 import org.ta4j.core.BaseBarSeries;
-import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Position;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.Trade;
 import org.ta4j.core.TradingRecord;
-import org.ta4j.core.analysis.cost.FixedTransactionCostModel;
-import org.ta4j.core.analysis.cost.ZeroCostModel;
 import org.ta4j.core.num.DoubleNum;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.LinkedBlockingDeque;
 
 public class TraderTemplate {
@@ -84,8 +73,6 @@ public class TraderTemplate {
     protected Bar lastBar = null;
     protected BaseBarSeries series;
 
-    protected TrendTest trendTest;
-
     protected boolean loadHistory = true;
     protected int continueIndex = 0;
     protected boolean mock = false;
@@ -102,11 +89,6 @@ public class TraderTemplate {
 
     double range2 = 5;
 
-    public static UMFuturesClientImpl client = new UMFuturesClientImpl(KlineUtil.API_KEY, KlineUtil.SECRET_KEY, KlineUtil.UM_BASE_URL);
-
-    private UMWebsocketClientImpl websocketClient = new UMWebsocketClientImpl();
-    SpotClientImpl spotClient = new SpotClientImpl(KlineUtil.API_KEY, KlineUtil.SECRET_KEY);
-
     protected long e = System.currentTimeMillis();
     protected long s = e - (5 * 24 * 60 * 60 * 1000);
     SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -115,12 +97,15 @@ public class TraderTemplate {
 
     private boolean init = true;
 
+    KlineClient binanceKlineClient = KlineFactory.Create(Server.BINANCE, ContractType.UMFUTURE);
+    TradeClient tradeClient = TradeClientFactory.Create(Server.BINANCE, ContractType.UMFUTURE);
+
     public TraderTemplate(boolean mock, Trade.TradeType tradeType, int amount, String interval, Currency currency, StrateFactory strategy, double range) {
         this.range2 = range;
         this.amount = amount;
         this.currency = currency;
         this.interval = interval;
-        thread = new Thread(this::trade);
+//        thread = new Thread(this::trade);
         thread.setName("trade-thread");
         thread.start();
 
@@ -144,37 +129,21 @@ public class TraderTemplate {
     }
 
     public void test(String interval) throws Exception {
-        BinanceKlineClient binanceKlineClient = new BinanceKlineClient();
+
         try {
-            binanceKlineClient.subscribe(currency.symbol(), interval, t -> {
-                Map map = null;
-                try {
-                    map = objectMapper.readValue(t.toString(), Map.class);
-                } catch (JsonProcessingException e) {
-                    throw new RuntimeException(e);
-                }
-                Map<String, Object> data = (Map<String, Object>) map.get("k");
-
-                long closeTime = Long.parseLong(data.get("T").toString());
-                Double o = Double.valueOf(data.get("o").toString());
-                Double h = Double.valueOf(data.get("c").toString());
-                Double l = Double.valueOf(data.get("h").toString());
-                Double c = Double.valueOf(data.get("l").toString());
-                Double v = Double.valueOf(data.get("v").toString());
-
-
+            for (KlineModule t : binanceKlineClient.getHistoryKlineData(currency, interval, System.currentTimeMillis() - 5 * 24 * 60 * 1000, System.currentTimeMillis())) {
                 Bar newBar = BaseBar.builder(DoubleNum::valueOf, Double.class)
                         .timePeriod(Duration.ofMinutes(1))
-                        .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(closeTime), ZoneId.systemDefault()))
-                        .openPrice(o)
-                        .highPrice(c)
-                        .lowPrice(h)
-                        .closePrice(l)
-                        .volume(v)
+                        .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(t.getEndTime()), ZoneId.systemDefault()))
+                        .openPrice(t.getOpen())
+                        .highPrice(t.getHigh())
+                        .lowPrice(t.getLow())
+                        .closePrice(t.getClose())
+                        .volume(t.getQuantity())
                         .build();
                 handler(newBar);
+            }
 
-            });
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -227,8 +196,8 @@ public class TraderTemplate {
                 System.out.println("离场有效策略 " + ((CollectRuleStrategy) strategy).getExitEffectiveRuleName()
                         + "离场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
 
-                if( !loadHistory && ((CollectRuleStrategy) strategy).getEffectiveWeight() > 2){
-                    sendMessageWebhook(currency+" 离场有效策略 " + ((CollectRuleStrategy) strategy).getExitEffectiveRuleName()
+                if (!loadHistory && ((CollectRuleStrategy) strategy).getEffectiveWeight() > 2) {
+                    sendMessageWebhook(currency + " 离场有效策略 " + ((CollectRuleStrategy) strategy).getExitEffectiveRuleName()
                             + "离场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
                 }
 
@@ -268,347 +237,123 @@ public class TraderTemplate {
 
 
     public void loadHistory() {
-        for (PriceBean priceBean : KlineUtil.getBar2(currency.symbol(), interval, s, e)) {
+        for (KlineModule d : binanceKlineClient.getHistoryKlineData(currency, interval, s, e)) {
             Bar newBar = BaseBar.builder(DoubleNum::valueOf, Double.class)
                     .timePeriod(Duration.ofMinutes(1))
-                    .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(priceBean.getEndTime()), ZoneId.systemDefault()))
-                    .openPrice(priceBean.getOpen().doubleValue())
-                    .highPrice(priceBean.getHigh().doubleValue())
-                    .lowPrice(priceBean.getLow().doubleValue())
-                    .closePrice(priceBean.getClose().doubleValue())
-                    .volume(priceBean.getVolume().doubleValue())
+                    .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(d.getEndTime()), ZoneId.systemDefault()))
+                    .openPrice(d.getOpen())
+                    .highPrice(d.getHigh())
+                    .lowPrice(d.getLow())
+                    .closePrice(d.getClose())
+                    .volume(d.getQuantity())
                     .build();
             handler(newBar);
         }
+
     }
 
-    //做多信号
-    public void tradeBuy(Bar bar) {
-        int endIndex = series.getEndIndex();
-        double v = amount / (bar.getClosePrice().doubleValue());
+//做多信号
+public void tradeBuy(Bar bar) {
+    int endIndex = series.getEndIndex();
+    double v = amount / (bar.getClosePrice().doubleValue());
 
 //        System.out.println("Entered on " +endIndex + "[" + bar + "]" + " (price=" + series.getBar(endIndex).getClosePrice().doubleValue());
-        //        if (tradetest.getType4h() == TrendType.NEUTRAL || tradetest.getType4h() == TrendType.GOOD || tradetest.getType4h() == TrendType.VERY_GOOD) {
-        TradingRecord tradingRecord = orderContext.enter(endIndex, bar.getClosePrice());
-        if (tradingRecord != null) {
-            Trade entry = tradingRecord.getLastEntry();
-            System.out.println("Entered on " + entry.getIndex() + "[" + bar + "]" + " (price=" + entry.getNetPrice().doubleValue()
-                    + ", amount=" + entry.getAmount().doubleValue() + ")");
-            if (!loadHistory && !mock) {
-                queue.add(new Order(entry.getNetPrice().doubleValue(), entry.getAmount().doubleValue(), OrderSide.BUY_LONG, currency.symbol()));
-            }
-            if (strategy instanceof CollectRuleStrategy) {
-                System.out.println("入场有效策略 " + ((CollectRuleStrategy) strategy).getEnterEffectiveRuleName()
-                        + "入场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
-            }
+    //        if (tradetest.getType4h() == TrendType.NEUTRAL || tradetest.getType4h() == TrendType.GOOD || tradetest.getType4h() == TrendType.VERY_GOOD) {
+    TradingRecord tradingRecord = orderContext.enter(endIndex, bar.getClosePrice());
+    if (tradingRecord != null) {
+        Trade entry = tradingRecord.getLastEntry();
+        System.out.println("Entered on " + entry.getIndex() + "[" + bar + "]" + " (price=" + entry.getNetPrice().doubleValue()
+                + ", amount=" + entry.getAmount().doubleValue() + ")");
+        if (!loadHistory && !mock) {
+            queue.add(new Order(entry.getNetPrice().doubleValue(), entry.getAmount().doubleValue(), OrderSide.BUY_LONG, currency.symbol()));
+        }
+        if (strategy instanceof CollectRuleStrategy) {
+            System.out.println("入场有效策略 " + ((CollectRuleStrategy) strategy).getEnterEffectiveRuleName()
+                    + "入场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
+        }
 //            }
-        }
-
     }
 
-    //做空信号
-    public TradingRecord tradeSell(Bar bar, int i) {
-        int endIndex = series.getEndIndex();
-        double v = amount / (bar.getClosePrice().doubleValue() + range2);
-//        if (tradingRecord.getLastEntry() != null && bar.getClosePrice().doubleValue() - tradingRecord.getLastEntry().getNetPrice().doubleValue() > range) {
-        TradingRecord exited = orderContext.exit(endIndex, i, bar.getClosePrice());
-        if (exited != null) {
-            Trade exit = exited.getLastExit();
-            Trade entry = exited.getLastEntry();
-            System.out.println("Exit on " + exit.getIndex() + "[" + bar + "]" + " (price=" + exit.getNetPrice().doubleValue()
-                    + ", amount=" + exit.getAmount().doubleValue() + ")");
-            if (!loadHistory && !mock) {
-//                orderLimitPingDuo(entry.getNetPrice().doubleValue() + range2);
-                queue.add(new Order(entry.getNetPrice().doubleValue(), exit.getAmount().doubleValue(), OrderSide.SELL_LONG, currency.symbol()));
-            }
+}
 
-            if (strategy instanceof CollectRuleStrategy) {
-                System.out.println("离场有效策略 " + ((CollectRuleStrategy) strategy).getExitEffectiveRuleName()
-                        + "离场分数" + ((CollectRuleStrategy) strategy).getEffectiveWeight());
-            }
-            return exited;
-        }
+
+
+public static class Order {
+    private int id;
+    private double price;
+    private double amount;
+    private OrderSide orderSide;
+
+    private String symbol;
+
+    public Order(int id, double price, double amount, OrderSide orderSide, String symbol) {
+        this.price = price;
+        this.orderSide = orderSide;
+        this.symbol = symbol;
+        this.amount = amount;
+        this.id = id;
+    }
+
+    public Order(double price, double amount, OrderSide orderSide, String symbol) {
+        this.price = price;
+        this.orderSide = orderSide;
+        this.symbol = symbol;
+        this.amount = amount;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public OrderSide getOrderSide() {
+        return orderSide;
+    }
+
+    public String getSymbol() {
+        return symbol;
+    }
+
+    public double getAmount() {
+        return amount;
+    }
+
+    public int getId() {
+        return id;
+    }
+}
+
+public String getDIndinUrl() {
+    try {
+        String url = "https://oapi.dingtalk.com/robot/send?access_token=793336df0ed161c1b9c082e7ff22ed360a2a1d3730fad8a753826ecc77a3d107";
+        Long timestamp = System.currentTimeMillis();
+        String secret = "SEC565e84ba79af6dc34b977b08a7b7bca1669f394ed36b7e1f2da377b6ff22195d";
+
+        String stringToSign = timestamp + "\n" + secret;
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes("UTF-8"), "HmacSHA256"));
+        byte[] signData = mac.doFinal(stringToSign.getBytes("UTF-8"));
+        String sign = URLEncoder.encode(new String(Base64.encodeBase64(signData)), "UTF-8");
+        return url + "&timestamp=" + timestamp + "&sign=" + sign;
+
+    } catch (Exception e) {
         return null;
-//        }
     }
+}
 
-
-    protected void orderLimitDuo(double price, double amount) {
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-                //下多单，28000美金，下单的数量是 price * quantity
-                parameters.put("symbol", currency.symbol());
-                parameters.put("side", "BUY");
-                parameters.put("positionSide", "long");
-                parameters.put("type", "LIMIT");
-                parameters.put("timeInForce", "GTC");
-                parameters.put("quantity", BigDecimal.valueOf(amount).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN).doubleValue());
-                parameters.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), RoundingMode.DOWN).doubleValue());
-                String result = client.account().newOrder(parameters);
-                System.out.println("买入订单信息：" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("买多单失败重试：" + e.getMessage());
-            }
-        }
+public void sendMessageWebhook(String msg) {
+    try {
+        DingTalkClient client = new DefaultDingTalkClient(getDIndinUrl());
+        OapiRobotSendRequest request = new OapiRobotSendRequest();
+        request.setMsgtype("text");
+        OapiRobotSendRequest.Text text = new OapiRobotSendRequest.Text();
+        text.setContent(msg);
+        request.setText(text);
+        OapiRobotSendRequest.At at = new OapiRobotSendRequest.At();
+        at.setIsAtAll(false);
+        request.setAt(at);
+        TaobaoResponse response = client.execute(request);
+        System.out.println(response.getBody());
+    } catch (Exception e) {
     }
-
-    protected void orderLimitPingDuo(double price, double amount) {
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-                LinkedHashMap<String, Object> parameters3 = new LinkedHashMap<>();
-                parameters3.put("symbol", currency.symbol());
-                parameters3.put("side", "SELL");
-                parameters3.put("positionSide", "long");
-                parameters3.put("type", "LIMIT");
-                parameters3.put("timeInForce", "GTC");
-                parameters3.put("quantity", BigDecimal.valueOf(amount).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN).doubleValue());
-                parameters3.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), RoundingMode.DOWN).doubleValue());
-                String result = client.account().newOrder(parameters3);
-                System.out.println("平多单" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("平多单失败重试：" + e.getMessage());
-            }
-        }
-    }
-
-    protected void orderLimitKong(double price) {
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-                parameters.put("symbol", currency.symbol());
-                parameters.put("side", "SELL");
-                parameters.put("positionSide", "SHORT");
-                parameters.put("type", "LIMIT");
-                parameters.put("timeInForce", "GTC");
-                parameters.put("quantity", BigDecimal.valueOf(amount / price).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                parameters.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), RoundingMode.DOWN));
-                String result = client.account().newOrder(parameters);
-                System.out.println("买入订单信息：" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("平多单失败重试：" + e.getMessage());
-            }
-        }
-    }
-
-
-    protected void orderMarketPingDuo(double price) {
-
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-                //下多单，28000美金，下单的数量是 price * quantity
-                parameters.put("symbol", currency.symbol());
-                parameters.put("side", "SELL");
-                parameters.put("positionSide", "long");
-                parameters.put("type", "MARKET");
-                parameters.put("quantity", BigDecimal.valueOf(amount / price).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                String result = client.account().newOrder(parameters);
-                System.out.println("平多单信息：" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("平多单失败重试：" + e.getMessage());
-            }
-        }
-    }
-
-
-    protected void orderMarketKong(double price) {
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-                parameters.put("symbol", currency.symbol());
-                parameters.put("side", "SELL");
-                parameters.put("positionSide", "SHORT");
-                parameters.put("type", "MARKET");
-                parameters.put("quantity", BigDecimal.valueOf(amount / price).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                String result = client.account().newOrder(parameters);
-                System.out.println("买入订单信息：" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("平多单失败重试：" + e.getMessage());
-            }
-        }
-    }
-
-    protected void orderLimitPingkong(double price) {
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters3 = new LinkedHashMap<>();
-                parameters3.put("symbol", currency.symbol());
-                parameters3.put("side", "BUY");
-                parameters3.put("positionSide", "SHORT");
-                parameters3.put("type", "LIMIT");
-                parameters3.put("timeInForce", "GTC");
-                parameters3.put("quantity", BigDecimal.valueOf(amount / price).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                parameters3.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), 1));
-                String result = client.account().newOrder(parameters3);
-                System.out.println("平空单" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("平空单失败重试：" + e.getMessage());
-            }
-        }
-    }
-
-    protected void orderMarketPingKong(double price) {
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-                parameters.put("symbol", currency.symbol());
-                parameters.put("side", "BUY");
-                parameters.put("positionSide", "SHORT");
-                parameters.put("type", "MARKET");
-                parameters.put("quantity", BigDecimal.valueOf(amount / price).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                String result = client.account().newOrder(parameters);
-                System.out.println("平空单信息：" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("平空单失败重试：" + e.getMessage());
-            }
-        }
-    }
-
-    protected void orderLimitBuy(double price) {
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-                //下多单，28000美金，下单的数量是 price * quantity
-                parameters.put("symbol", currency.symbol());
-                parameters.put("side", "BUY");
-                parameters.put("type", "LIMIT");
-                parameters.put("timeInForce", "GTC");
-                parameters.put("quantity", BigDecimal.valueOf(amount / price).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                parameters.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), RoundingMode.DOWN));
-                String result = spotClient.createTrade().newOrder(parameters);
-                System.out.println("买入订单信息：" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("买多单失败重试：" + e.getMessage());
-            }
-        }
-    }
-
-    protected void orderLimitSell(double price) {
-        for (int i = 0; i < 3; i++) {
-            try {
-                LinkedHashMap<String, Object> parameters3 = new LinkedHashMap<>();
-                parameters3.put("symbol", currency.symbol());
-                parameters3.put("side", "SELL");
-                parameters3.put("type", "LIMIT");
-                parameters3.put("timeInForce", "GTC");
-                parameters3.put("quantity", BigDecimal.valueOf(amount / price).setScale(currency.getQuantityPrecision(), RoundingMode.DOWN));
-                parameters3.put("price", BigDecimal.valueOf(price).setScale(currency.getPricePrecision(), RoundingMode.DOWN));
-                String result = spotClient.createTrade().newOrder(parameters3);
-                System.out.println("平多单" + result);
-                break;
-            } catch (Exception e) {
-                System.out.println("平多单失败重试：" + e.getMessage());
-            }
-        }
-    }
-
-    protected void trade() {
-        websocketClient.partialDepthStream(currency.symbol(), 20, 100, ((event) -> {
-            Order order = queue.peekFirst();
-            if (order != null) {
-                Map parse = JsonUtil.parse(event, Map.class);
-                if (Long.valueOf(parse.get("T").toString()) - System.currentTimeMillis() < 500) {
-                    if (order.getOrderSide() == OrderSide.BUY_LONG) {
-                        List data = (List) parse.get("a");
-                        List o = (List) data.get(data.size() - 4);
-                        double v = Double.parseDouble(o.get(0).toString());
-                        if (v - order.getPrice() < 0) {
-                            orderLimitDuo(v * (1 - range2), order.amount);
-                            queue.remove(order);
-                            System.out.println(simpleDateFormat.format(new Date()) + "开多单, 价格:" + (v - range2));
-                        }
-                    } else if (order.getOrderSide() == OrderSide.SELL_LONG) {
-
-                        List data = (List) parse.get("b");
-                        List o = (List) data.get(3);
-                        double v = Double.parseDouble(o.get(0).toString());
-                        if (v - order.getPrice() > 0) {
-                            orderLimitPingDuo(v * (1 + range2), order.amount);
-                            queue.remove(order);
-                            System.out.println(simpleDateFormat.format(new Date()) + "平多单, 价格:" + (v + range2));
-                        }
-                    }
-                }
-            }
-
-
-        }));
-    }
-
-
-    public static class Order {
-        private double price;
-        private double amount;
-        private OrderSide orderSide;
-
-        private String symbol;
-
-        public Order(double price, double amount, OrderSide orderSide, String symbol) {
-            this.price = price;
-            this.orderSide = orderSide;
-            this.symbol = symbol;
-            this.amount = amount;
-        }
-
-        public double getPrice() {
-            return price;
-        }
-
-        public OrderSide getOrderSide() {
-            return orderSide;
-        }
-
-        public String getSymbol() {
-            return symbol;
-        }
-
-        public double getAmount() {
-            return amount;
-        }
-    }
-
-    public String getDIndinUrl() {
-        try {
-            String url = "https://oapi.dingtalk.com/robot/send?access_token=793336df0ed161c1b9c082e7ff22ed360a2a1d3730fad8a753826ecc77a3d107";
-            Long timestamp = System.currentTimeMillis();
-            String secret = "SEC565e84ba79af6dc34b977b08a7b7bca1669f394ed36b7e1f2da377b6ff22195d";
-
-            String stringToSign = timestamp + "\n" + secret;
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secret.getBytes("UTF-8"), "HmacSHA256"));
-            byte[] signData = mac.doFinal(stringToSign.getBytes("UTF-8"));
-            String sign = URLEncoder.encode(new String(Base64.encodeBase64(signData)), "UTF-8");
-            return url + "&timestamp=" + timestamp + "&sign=" + sign;
-
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public void sendMessageWebhook(String msg) {
-        try {
-            DingTalkClient client = new DefaultDingTalkClient(getDIndinUrl());
-            OapiRobotSendRequest request = new OapiRobotSendRequest();
-            request.setMsgtype("text");
-            OapiRobotSendRequest.Text text = new OapiRobotSendRequest.Text();
-            text.setContent(msg);
-            request.setText(text);
-            OapiRobotSendRequest.At at = new OapiRobotSendRequest.At();
-            at.setIsAtAll(false);
-            request.setAt(at);
-            TaobaoResponse response = client.execute(request);
-            System.out.println(response.getBody());
-        } catch (Exception e) {
-        }
-    }
+}
 }

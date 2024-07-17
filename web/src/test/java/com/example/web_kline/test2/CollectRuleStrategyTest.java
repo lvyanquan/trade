@@ -20,18 +20,16 @@ package com.example.web_kline.test2;
 
 import org.example.ExitTimeRule;
 import org.example.StrateFactory;
-import org.example.data.currency.CurrencyRegister;
-import org.example.enums.OrderSide;
+import org.example.model.currency.CurrencyRegister;
 import org.example.indicators.AtrLowerIndicator;
 import org.example.indicators.BopIndicators;
 import org.example.indicators.macd.DEAIndicator;
+import org.example.model.enums.OrderSide;
 import org.example.rule.AroonRule;
 import org.example.rule.AtrOrderPriceRule;
 import org.example.rule.BollingerBandsWidthRule;
 import org.example.rule.CrossedDownCacheIndicatorRule;
 import org.example.rule.CrossedPushCacheIndicatorRule;
-import org.example.rule.EmaRule;
-import org.example.rule.HightRule;
 import org.example.rule.NumericRule;
 import org.example.rule.BearishEngulfingRule;
 import org.example.rule.BullishHaramiRule;
@@ -40,6 +38,7 @@ import org.example.strategy.CollectRuleStrategy;
 import org.example.rule.WeightRule;
 import org.example.rule.WeightRuleWrapper;
 import org.ta4j.core.BarSeries;
+import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Strategy;
@@ -49,8 +48,6 @@ import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.MACDIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
-import org.ta4j.core.indicators.aroon.AroonDownIndicator;
-import org.ta4j.core.indicators.aroon.AroonUpIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsMiddleIndicator;
 import org.ta4j.core.indicators.bollinger.BollingerBandsUpperIndicator;
@@ -61,7 +58,6 @@ import org.ta4j.core.indicators.helpers.HighestValueIndicator;
 import org.ta4j.core.indicators.numeric.NumericIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.Num;
-import org.ta4j.core.rules.CrossedDownIndicatorRule;
 import org.ta4j.core.rules.CrossedUpIndicatorRule;
 
 import java.util.ArrayList;
@@ -74,7 +70,7 @@ public class CollectRuleStrategyTest {
 
         StrateFactory strateFactory = new StrateFactory() {
             @Override
-            public Strategy buildStrategy(BarSeries series) {
+            public BaseStrategy buildStrategy(BarSeries series) {
                 ArrayList<WeightRule> exitRules = new ArrayList<>();
                 ArrayList<WeightRule> enterRules = new ArrayList<>();
 
@@ -206,11 +202,13 @@ public class CollectRuleStrategyTest {
             }
         };
 
-        test("PYTHUSDT", "15m", 800, false, strateFactory);
+//        test("PYTHUSDT", "15m", 800, false, strateFactory);
         Thread.sleep(10000);
-        test("SUIUSDT", "15m", 800, false, strateFactory);
+//        test("SUIUSDT", "15m", 800, false, strateFactory);
         Thread.sleep(10000);
-        test("BNTUSDT", "15m", 1000, false, strateFactory);
+        test("BNTUSDT", "15m", 800, false, strateFactory);
+        test("BTCUSDT", "15m", 800, false, strateFactory);
+        test("ETHUSDT", "15m", 800, false, strateFactory);
     }
 
     private static void test(String currency, String interval, int amount, boolean mock, StrateFactory strateFactory) {

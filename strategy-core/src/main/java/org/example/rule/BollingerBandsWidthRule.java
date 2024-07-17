@@ -18,9 +18,9 @@
 
 package org.example.rule;
 
-import org.example.enums.OrderSide;
 import org.example.indicators.BollingWidthDescriptiveIndicator;
 import org.example.indicators.BollingerBandsWidthIndicator;
+import org.example.model.enums.OrderSide;
 import org.ta4j.core.Rule;
 import org.ta4j.core.TradingRecord;
 import org.ta4j.core.indicators.bollinger.BollingerBandsLowerIndicator;

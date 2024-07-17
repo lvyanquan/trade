@@ -19,14 +19,12 @@
 package com.example.web_kline.market;
 
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
-import org.example.data.Tiket24Bean;
-import org.example.data.currency.BaseCurrency;
-import org.example.data.currency.CurrencyRegister;
+import org.example.model.market.Tiket24Bean;
+import org.example.model.currency.CurrencyRegister;
 import org.example.util.JsonUtil;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;

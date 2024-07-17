@@ -21,11 +21,11 @@ package com.example.web_kline.web;
 
 import com.example.web_kline.datasource.entity.Kline;
 import com.example.web_kline.dto.KlineFindDto;
-import com.example.web_kline.dto.SubscribeHistoryKlineDto;
 import com.example.web_kline.dto.SubscribeKlineDto;
 import com.example.web_kline.service.KlineService;
-import org.example.KlineClient;
-import org.example.core.dto.ResponseData;
+import org.example.model.currency.BaseCurrency;
+import org.example.kline.KlineClient;
+import com.example.web_kline.dto.ResponseData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -34,7 +34,6 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
@@ -57,13 +56,7 @@ public class KlineWeb {
 
     @RequestMapping(value = "/subscribe", method = RequestMethod.POST)
     public ResponseData subscribe(@RequestBody SubscribeKlineDto subscribeKlineDto) {
-        client.subscribe(subscribeKlineDto.getSymbol(), subscribeKlineDto.getInterval(), t -> kafkaTemplate.send("kline_" + subscribeKlineDto.getSymbol(), t));
-        return ResponseData.ResponseDataBuilder.OK().build();
-    }
-
-    @RequestMapping(value = "/sync/history", method = RequestMethod.POST)
-    public ResponseData syncHistory(@RequestBody SubscribeHistoryKlineDto subscribeHistoryKlineDto) {
-        client.subscribeHistory(subscribeHistoryKlineDto.getSymbol(), subscribeHistoryKlineDto.getInterval(), subscribeHistoryKlineDto.getStartTime(), subscribeHistoryKlineDto.getEndTime());
+        client.handlerStreamingKlineData(BaseCurrency.of(subscribeKlineDto.getSymbol(), 0, 0),subscribeKlineDto.getInterval(), t -> kafkaTemplate.send("kline_",t));
         return ResponseData.ResponseDataBuilder.OK().build();
     }
 

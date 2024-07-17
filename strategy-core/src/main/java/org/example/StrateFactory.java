@@ -18,8 +18,8 @@
 
 package org.example;
 
-import org.example.enums.OrderSide;
 import org.example.indicators.SupertrendIndicator;
+import org.example.model.enums.OrderSide;
 import org.example.rule.SupertrendRule;
 import org.example.rule.CrossedDownCacheIndicatorRule;
 import org.example.rule.CrossedPushCacheIndicatorRule;
@@ -43,7 +43,7 @@ public interface StrateFactory {
 
     public static StrateFactory TREND_FACTORY = new StrateFactory() {
         @Override
-        public Strategy buildStrategy(BarSeries series) {
+        public BaseStrategy buildStrategy(BarSeries series) {
 
             int atrPeriod = 9;
             // Define the Supertrend indicator using ATR
@@ -69,7 +69,7 @@ public interface StrateFactory {
 //            Rule aroonBullish = new OverIndicatorRule(aroonUp, aroonDown);
             Rule aroonBearish = new UnderIndicatorRule(aroonUp, aroonDown);
 
-            Strategy strategy = new BaseStrategy(
+            BaseStrategy strategy = new BaseStrategy(
                     new SupertrendRule(supertrendUpIndicator, supertrendDnIndicator, closePriceIndicator, true),
                     new LossByAtrRule(new ATRIndicator(series,9),new ClosePriceIndicator(series), OrderSide.BUY_LONG)
                             .or((new SupertrendRule(supertrendUpIndicator, supertrendDnIndicator, closePriceIndicator, false).and(aroonBearish)))
@@ -80,7 +80,7 @@ public interface StrateFactory {
 
     public static StrateFactory TREND_SELL_FACTORY = new StrateFactory() {
         @Override
-        public Strategy buildStrategy(BarSeries series) {
+        public BaseStrategy buildStrategy(BarSeries series) {
 
             if (series == null) {
                 throw new IllegalArgumentException("Series cannot be null");
@@ -115,7 +115,7 @@ public interface StrateFactory {
 
 
             // Create a trading strategy
-            Strategy strategy = new BaseStrategy(
+            BaseStrategy strategy = new BaseStrategy(
                     new SupertrendRule(supertrendUpIndicator, supertrendDnIndicator, closePriceIndicator, false).and(aroonBearish),
                     new SupertrendRule(supertrendUpIndicator, supertrendDnIndicator, closePriceIndicator, true).and(aroonBullish)
             );
@@ -127,7 +127,7 @@ public interface StrateFactory {
 
     public static StrateFactory MACD_CROSS_FACTORY = new StrateFactory() {
         @Override
-        public Strategy buildStrategy(BarSeries series) {
+        public BaseStrategy buildStrategy(BarSeries series) {
             ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
 
             MACDIndicator macdIndicator = new MACDIndicator(closePriceIndicator);
@@ -143,7 +143,7 @@ public interface StrateFactory {
             Rule macdGoldenCross = new CrossedPushCacheIndicatorRule(macdLine, macdIndicator).and(new CrossedPushCacheIndicatorRule(emaIndicator, emaIndicator1));
 
             // Create a trading strategy
-            Strategy strategy = new BaseStrategy(
+            BaseStrategy strategy = new BaseStrategy(
                     macdGoldenCross,
                     macdDeathCross
             );
@@ -151,5 +151,5 @@ public interface StrateFactory {
         }
     };
 
-    Strategy buildStrategy(BarSeries series);
+    BaseStrategy buildStrategy(BarSeries series);
 }

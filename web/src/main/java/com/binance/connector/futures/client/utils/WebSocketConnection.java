@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 public class WebSocketConnection extends WebSocketListener {
     private static final AtomicInteger connectionCounter = new AtomicInteger(0);
     private static final int NORMAL_CLOSURE_STATUS = 1000;
-    private static final OkHttpClient client = HttpClientSingleton.getHttpClient(new ProxyAuth(new Proxy(Proxy.Type.HTTP,new InetSocketAddress("127.0.0.1",12)), null));
+    private static final OkHttpClient client = HttpClientSingleton.getHttpClient(new ProxyAuth(new Proxy(Proxy.Type.HTTP,new InetSocketAddress("127.0.0.1",7890)), null));
     private static final Logger logger = LoggerFactory.getLogger(WebSocketConnection.class);
 
     private final WebSocketCallback onOpenCallback;

@@ -19,7 +19,7 @@
 package com.example.web_kline.Order;
 
 import com.example.web_kline.util.BinanceOrderUtil;
-import org.example.enums.OrderSide;
+import org.example.model.enums.OrderSide;
 import org.example.util.JsonUtil;
 
 import java.math.BigDecimal;

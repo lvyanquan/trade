@@ -18,30 +18,21 @@
 
 package com.example.web_kline.Order;
 
-import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
-import com.example.web_kline.test2.TraderTemplate;
-import jdk.nashorn.internal.runtime.ListAdapter;
-import org.example.data.currency.Currency;
-import org.example.util.JsonUtil;
+import org.example.model.currency.Currency;
 import org.ta4j.core.Bar;
-import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.Trade;
 import org.ta4j.core.TradingRecord;
 import org.ta4j.core.analysis.cost.FixedTransactionCostModel;
 import org.ta4j.core.analysis.cost.ZeroCostModel;
-import org.ta4j.core.num.DoubleNum;
-import org.ta4j.core.num.NaN;
 import org.ta4j.core.num.Num;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public class OrderContext {
     private List<TradingRecord> orders = new ArrayList<>();
@@ -120,22 +111,22 @@ public class OrderContext {
     }
 
     public void init(Currency currency) {
-        String s = TraderTemplate.client.account().accountInformation(new LinkedHashMap<>());
-        Map<String, Object> accountMap = JsonUtil.parseForMap(s);
-        List<Map<String, Object>> positions = (List<Map<String, Object>>) accountMap.get("positions");
-        for (Map<String, Object> position : positions) {
-
-            Double positionAmt = Double.valueOf(position.get("positionAmt").toString());
-            String symbol = position.get("symbol").toString();
-            String positionSide = position.get("positionSide").toString();
-            //做多的单子
-            if (positionAmt != 0 && currency.symbol().equalsIgnoreCase(symbol) && positionSide.equalsIgnoreCase("LONG")) {
-                Double price = Double.valueOf(position.get("entryPrice").toString());
-                BaseTradingRecord baseTradingRecord = new BaseTradingRecord(tradeType, new FixedTransactionCostModel(0.0002), new ZeroCostModel());
-                openOrders.add(baseTradingRecord);
-                baseTradingRecord.enter(0, DoubleNum.valueOf(price), DoubleNum.valueOf(positionAmt));
-            }
-        }
+//        String s = TraderTemplate.client.account().accountInformation(new LinkedHashMap<>());
+//        Map<String, Object> accountMap = JsonUtil.parseForMap(s);
+//        List<Map<String, Object>> positions = (List<Map<String, Object>>) accountMap.get("positions");
+//        for (Map<String, Object> position : positions) {
+//
+//            Double positionAmt = Double.valueOf(position.get("positionAmt").toString());
+//            String symbol = position.get("symbol").toString();
+//            String positionSide = position.get("positionSide").toString();
+//            //做多的单子
+//            if (positionAmt != 0 && currency.symbol().equalsIgnoreCase(symbol) && positionSide.equalsIgnoreCase("LONG")) {
+//                Double price = Double.valueOf(position.get("entryPrice").toString());
+//                BaseTradingRecord baseTradingRecord = new BaseTradingRecord(tradeType, new FixedTransactionCostModel(0.0002), new ZeroCostModel());
+//                openOrders.add(baseTradingRecord);
+//                baseTradingRecord.enter(0, DoubleNum.valueOf(price), DoubleNum.valueOf(positionAmt));
+//            }
+//        }
     }
 
 

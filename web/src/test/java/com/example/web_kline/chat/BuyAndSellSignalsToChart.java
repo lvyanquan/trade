@@ -18,33 +18,33 @@
 
 package com.example.web_kline.chat;
 
-import org.example.data.PriceBean;
-import org.example.indicators.SuperTrendLowerBandIndicator;
-import org.example.indicators.SuperTrendUpperBandIndicator;
+import org.example.binance.factory.KlineFactory;
 import org.example.indicators.SupertrendIndicator;
+import org.example.model.currency.BaseCurrency;
+import org.example.model.currency.Btc;
+import org.example.model.enums.Server;
+import org.example.model.enums.ContractType;
+import org.example.model.market.KlineModule;
 import org.example.rule.SupertrendRule;
-import org.example.util.KlineUtil;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.annotations.XYPointerAnnotation;
 import org.jfree.chart.annotations.XYShapeAnnotation;
-import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.axis.NumberAxis;
-import org.jfree.chart.labels.XYToolTipGenerator;
-import org.jfree.chart.plot.Marker;
+import org.jfree.chart.axis.ValueAxis;
+import org.jfree.chart.plot.CombinedDomainXYPlot;
 import org.jfree.chart.plot.ValueMarker;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.StandardXYItemRenderer;
-import org.jfree.chart.renderer.xy.XYItemRenderer;
-import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.ui.ApplicationFrame;
+import org.jfree.chart.ui.Layer;
 import org.jfree.chart.ui.UIUtils;
 import org.jfree.data.time.Minute;
 import org.jfree.data.time.TimeSeriesCollection;
-import org.jfree.data.xy.XYDataset;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
+import org.ta4j.core.BarSeriesManager;
 import org.ta4j.core.BaseBar;
 import org.ta4j.core.BaseBarSeries;
 import org.ta4j.core.BaseStrategy;
@@ -52,20 +52,17 @@ import org.ta4j.core.Indicator;
 import org.ta4j.core.Position;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Strategy;
-import org.ta4j.core.BarSeriesManager;
 import org.ta4j.core.indicators.aroon.AroonDownIndicator;
 import org.ta4j.core.indicators.aroon.AroonUpIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.helpers.HighPriceIndicator;
+import org.ta4j.core.indicators.numeric.NumericIndicator;
 import org.ta4j.core.num.DoubleNum;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.rules.OverIndicatorRule;
 import org.ta4j.core.rules.UnderIndicatorRule;
 
-
 import java.awt.*;
 import java.awt.geom.Ellipse2D;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -78,6 +75,7 @@ import java.util.List;
  * strategy.
  */
 public class BuyAndSellSignalsToChart {
+
 
     /**
      * Builds a JFreeChart time series from a Ta4j bar series and an indicator.
@@ -111,9 +109,9 @@ public class BuyAndSellSignalsToChart {
         // Running the strategy
         BarSeriesManager seriesManager = new BarSeriesManager(series);
         List<Position> positions = seriesManager.run(strategy).getPositions();
-        positions.stream().mapToDouble(e->e.getExit().getNetPrice().minus(e.getEntry().getNetPrice()).doubleValue()).filter(i->i>0).count();
+        positions.stream().mapToDouble(e -> e.getExit().getNetPrice().minus(e.getEntry().getNetPrice()).doubleValue()).filter(i -> i > 0).count();
 
-        positions.stream().mapToDouble(e->e.getExit().getNetPrice().minus(e.getEntry().getNetPrice()).doubleValue()).sum();
+        positions.stream().mapToDouble(e -> e.getExit().getNetPrice().minus(e.getEntry().getNetPrice()).doubleValue()).sum();
 
         for (Position position : positions) {
             // Buy signal
@@ -125,7 +123,6 @@ public class BuyAndSellSignalsToChart {
             buyAnnotation.setTipRadius(10.0);
             buyAnnotation.setPaint(Color.GREEN);
             plot.addAnnotation(buyAnnotation);
-
 
 
             Shape buyShape = new Ellipse2D.Double(-5, -5, 10, 10); // Increase the size of the circle
@@ -199,20 +196,37 @@ public class BuyAndSellSignalsToChart {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        BarSeries series =new BaseBarSeries("mySeries", DoubleNum::valueOf);
+        BarSeries series = new BaseBarSeries("mySeries", DoubleNum::valueOf);
         long e = System.currentTimeMillis();
-        long s = e - (1000*24 * 60 *60 * 1000);
-        for (PriceBean priceBean : KlineUtil.getBar2("BTCUSDT", "5m", s, e)) {
+        long s = e - (1000 * 24 * 60 * 60 * 1000);
+        for (KlineModule klineModule : KlineFactory.Create(Server.BINANCE, ContractType.UMFUTURE).getHistoryKlineData(Btc.BTC, "5m", s, e)) {
             Bar newBar = BaseBar.builder(DoubleNum::valueOf, Double.class)
                     .timePeriod(Duration.ofMinutes(1))
-                    .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(priceBean.getEndTime()), ZoneId.systemDefault()))
-                    .openPrice(priceBean.getOpen().doubleValue())
-                    .highPrice(priceBean.getHigh().doubleValue())
-                    .lowPrice(priceBean.getLow().doubleValue())
-                    .closePrice(priceBean.getClose().doubleValue())
-                    .volume(priceBean.getVolume().doubleValue())
+                    .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(klineModule.getEndTime()), ZoneId.systemDefault()))
+                    .openPrice(klineModule.getOpen())
+                    .highPrice(klineModule.getHigh())
+                    .lowPrice(klineModule.getLow())
+                    .closePrice(klineModule.getClose())
+                    .volume(klineModule.getQuantity())
                     .build();
             series.addBar(newBar);
+        }
+
+        BarSeries usdc = new BaseBarSeries("mySeries2", DoubleNum::valueOf);
+
+
+        for (KlineModule klineModule : KlineFactory.Create(Server.BINANCE, ContractType.UMFUTURE).getHistoryKlineData(BaseCurrency
+                .of("BTCUSDC"), "5m", s, e)) {
+            Bar newBar = BaseBar.builder(DoubleNum::valueOf, Double.class)
+                    .timePeriod(Duration.ofMinutes(1))
+                    .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(klineModule.getEndTime()), ZoneId.systemDefault()))
+                    .openPrice(klineModule.getOpen())
+                    .highPrice(klineModule.getHigh())
+                    .lowPrice(klineModule.getLow())
+                    .closePrice(klineModule.getClose())
+                    .volume(klineModule.getQuantity())
+                    .build();
+            usdc.addBar(newBar);
         }
 
         // Getting the bar series
@@ -238,24 +252,22 @@ public class BuyAndSellSignalsToChart {
         );
 
 
-        // Create a trading strategy
-        Strategy strategy = new BaseStrategy(
-                new SupertrendRule(supertrendUpIndicator, supertrendDnIndicator, closePriceIndicator, true),
-                new SupertrendRule(supertrendUpIndicator, supertrendDnIndicator, closePriceIndicator, false)
-        );
-
         /*
          * Building chart datasets
          */
         TimeSeriesCollection dataset = new TimeSeriesCollection();
         dataset.addSeries(buildChartTimeSeries(series, new ClosePriceIndicator(series), "Bitstamp Bitcoin (BTC)"));
 
-        TimeSeriesCollection dataset1 = new TimeSeriesCollection();
-        dataset1.addSeries(buildChartTimeSeries(series, new SuperTrendLowerBandIndicator(series), "SuperTrendLowerBandIndicator (BTC)"));
-
-
         TimeSeriesCollection dataset2 = new TimeSeriesCollection();
-        dataset2.addSeries(buildChartTimeSeries(series, new SuperTrendUpperBandIndicator(series), "SuperTrendUpperBandIndicator (BTC)"));
+        dataset2.addSeries(buildChartTimeSeries(series, NumericIndicator.of(new ClosePriceIndicator(usdc)).minus(new ClosePriceIndicator(series)), "USDC和USDT差值"));
+
+
+//        TimeSeriesCollection dataset1 = new TimeSeriesCollection();
+//        dataset1.addSeries(buildChartTimeSeries(series, new SuperTrendLowerBandIndicator(series), "SuperTrendLowerBandIndicator (BTC)"));
+//
+//
+//        TimeSeriesCollection dataset2 = new TimeSeriesCollection();
+//        dataset2.addSeries(buildChartTimeSeries(series, new SuperTrendUpperBandIndicator(series), "SuperTrendUpperBandIndicator (BTC)"));
 
 
         /*
@@ -271,18 +283,19 @@ public class BuyAndSellSignalsToChart {
         );
         XYPlot plot = (XYPlot) chart.getPlot();
 
-        addCashFlowAxis(plot,dataset1,Color.green,1);
-        addCashFlowAxis(plot,dataset2,Color.blue,2);
+        chart =   addAuxiliaryChart(plot,dataset2, Color.green);
+//        addCashFlowAxis(plot, dataset1, Color.green, 1);
+//        addCashFlowAxis(plot, dataset2, Color.blue, 2);
 
         /*
          * Running the strategy and adding the buy and sell signals to plot
          */
-        addBuySellSignals(series, strategy(series), plot);
+//        addBuySellSignals(series, strategy(series), plot);
 
         displayChart(chart);
     }
 
-    private static void addCashFlowAxis(XYPlot plot, TimeSeriesCollection dataset,Color color, int index) {
+    private static void addCashFlowAxis(XYPlot plot, TimeSeriesCollection dataset, Color color, int index) {
 //        final NumberAxis cashAxis = new NumberAxis("Cash Flow Ratio");
 //        cashAxis.setAutoRangeIncludesZero(false);
 //        plot.setRangeAxis(index, cashAxis);
@@ -290,12 +303,69 @@ public class BuyAndSellSignalsToChart {
 //        plot.mapDatasetToRangeAxis(index, index);
 
         final StandardXYItemRenderer cashFlowRenderer = new StandardXYItemRenderer();
-        cashFlowRenderer.setSeriesPaint(0,color);
+        cashFlowRenderer.setSeriesPaint(0, color);
         plot.setRenderer(index, cashFlowRenderer);
 //        plot.setRenderer(index, new XYLineAndShapeRenderer(true, false));
     }
 
-    private static Strategy strategy(BarSeries series){
+    private static JFreeChart addAuxiliaryChart(XYPlot plot, TimeSeriesCollection dataset, Color color) {
+
+
+// 创建新的Y轴
+        NumberAxis macdAxis = new NumberAxis("Secondary Axis Label");
+
+        XYPlot macdPlot = new XYPlot(dataset, null, macdAxis, new StandardXYItemRenderer());
+
+// 创建CombinedDomainXYPlot来组合主图和副图
+        ValueAxis domainAxis = plot.getDomainAxis();
+        CombinedDomainXYPlot combinedPlot = new CombinedDomainXYPlot(domainAxis);
+
+// 添加主图和副图
+        combinedPlot.add(plot, 3); // 分配更多的空间给主图
+        combinedPlot.add(macdPlot, 1); // 分配较少的空间给MACD副图
+
+
+        // 创建并配置-10的水平线
+        ValueMarker markerMinus10 = new ValueMarker(-10);
+        markerMinus10.setPaint(Color.red); // 设置颜色为红色
+        markerMinus10.setStroke(new BasicStroke(1.0f)); // 设置线型
+        markerMinus10.setLabel("-10"); // 设置标签
+        macdPlot.addRangeMarker(markerMinus10, Layer.BACKGROUND); // 添加到副图
+
+// 创建并配置0的水平线
+        ValueMarker marker0 = new ValueMarker(0);
+        marker0.setPaint(Color.green); // 设置颜色为绿色
+        marker0.setStroke(new BasicStroke(1.0f)); // 设置线型
+        marker0.setLabel("0"); // 设置标签
+        macdPlot.addRangeMarker(marker0, Layer.BACKGROUND); // 添加到副图
+
+// 创建并配置10的水平线
+        ValueMarker marker10 = new ValueMarker(10);
+        marker10.setPaint(Color.blue); // 设置颜色为蓝色
+        marker10.setStroke(new BasicStroke(1.0f)); // 设置线型
+        marker10.setLabel("10"); // 设置标签
+        macdPlot.addRangeMarker(marker10, Layer.BACKGROUND); // 添加到副图
+
+// 创建图表
+     return new JFreeChart("Chart Title", JFreeChart.DEFAULT_TITLE_FONT, combinedPlot, true);
+
+//// 将新轴添加到图表中（此例中为第2个Y轴）
+//        int secondaryAxisIndex = plot.getRangeAxisCount();
+//        plot.setRangeAxis(secondaryAxisIndex, secondaryAxis);
+//
+//// 配置附图的渲染器，例如使用XYLineAndShapeRenderer
+//        XYItemRenderer secondaryRenderer = new XYLineAndShapeRenderer();
+//
+//// 将渲染器和数据集添加到图表
+//        plot.setRenderer(secondaryAxisIndex, secondaryRenderer);
+//        plot.setDataset(secondaryAxisIndex, dataset);
+//
+//// 关联数据集和新的Y轴
+//        plot.mapDatasetToRangeAxis(secondaryAxisIndex, secondaryAxisIndex);
+
+    }
+
+    private static Strategy strategy(BarSeries series) {
         ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
         int atrPeriod = 9;
 

@@ -18,11 +18,14 @@
 
 package com.example.web_kline.analy;
 
+import org.example.binance.factory.KlineFactory;
 import org.example.criteria.ReturnCriterion;
-import org.example.data.PriceBean;
 import org.example.indicators.SupertrendIndicator;
+import org.example.model.currency.Btc;
+import org.example.model.enums.Server;
+import org.example.model.enums.ContractType;
+import org.example.model.market.KlineModule;
 import org.example.rule.SupertrendRule;
-import org.example.util.KlineUtil;
 import org.ta4j.core.AnalysisCriterion;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
@@ -86,18 +89,19 @@ public class Test {
     private static void loadHistory(BaseBarSeries series) {
         long e = System.currentTimeMillis();
         long s = e - (1000 * 60 * 1000);
-        for (PriceBean priceBean : KlineUtil.getBar("BTCUSDT", "5m", s, e)) {
+        for (KlineModule klineModule : KlineFactory.Create(Server.BINANCE, ContractType.UMFUTURE).getHistoryKlineData(Btc.BTC, "5m", s, e)) {
             Bar newBar = BaseBar.builder(DoubleNum::valueOf, Double.class)
                     .timePeriod(Duration.ofMinutes(1))
-                    .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(priceBean.getEndTime()), ZoneId.systemDefault()))
-                    .openPrice(priceBean.getOpen().doubleValue())
-                    .highPrice(priceBean.getHigh().doubleValue())
-                    .lowPrice(priceBean.getLow().doubleValue())
-                    .closePrice(priceBean.getClose().doubleValue())
-                    .volume(priceBean.getVolume().doubleValue())
+                    .endTime(ZonedDateTime.ofInstant(Instant.ofEpochMilli(klineModule.getEndTime()), ZoneId.systemDefault()))
+                    .openPrice(klineModule.getOpen())
+                    .highPrice(klineModule.getHigh())
+                    .lowPrice(klineModule.getLow())
+                    .closePrice(klineModule.getClose())
+                    .volume(klineModule.getQuantity())
                     .build();
             series.addBar(newBar);
         }
+
 
     }
 
@@ -132,7 +136,7 @@ public class Test {
         AroonDownIndicator aroonDown = new AroonDownIndicator(series, 25);  // 使用25周期
 
         // Aroon策略规则
-        Rule  aroonBullish = new OverIndicatorRule(aroonUp, aroonDown);
+        Rule aroonBullish = new OverIndicatorRule(aroonUp, aroonDown);
         Rule aroonBearish = new UnderIndicatorRule(aroonUp, aroonDown);
 
         ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(series);
@@ -153,7 +157,6 @@ public class Test {
         );
 
 
-
         Strategy strategy2 = new BaseStrategy(
                 new SupertrendRule(supertrendUpIndicator, supertrendDnIndicator, closePriceIndicator, true).and(aroonBullish),
                 new SupertrendRule(supertrendUpIndicator, supertrendDnIndicator, closePriceIndicator, false).and(aroonBearish));
@@ -166,7 +169,6 @@ public class Test {
         Rule rsiOversold = new UnderIndicatorRule(rsi, 30);
 
 
-
         ClosePriceIndicator closePriceIndicator3 = new ClosePriceIndicator(series);
 
         // Define the Supertrend indicator using ATR
@@ -176,7 +178,6 @@ public class Test {
                 3d,
                 true// Multiplier
         );
-
 
 
         Indicator<Num> supertrendDnIndicator3 = new SupertrendIndicator(

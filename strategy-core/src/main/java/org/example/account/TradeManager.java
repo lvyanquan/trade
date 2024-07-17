@@ -18,10 +18,10 @@
 
 package org.example.account;
 
-import org.example.data.PriceBean;
-import org.example.data.currency.Currency;
-import org.example.enums.OrderType;
-import org.example.order.Order;
+import org.example.client.dto.OrderDto;
+import org.example.model.currency.Currency;
+import org.example.model.enums.OrderType;
+import org.example.model.market.KlineModule;
 
 import java.math.BigDecimal;
 import java.util.concurrent.CompletableFuture;
@@ -36,7 +36,7 @@ public abstract class TradeManager {
 
     //下单 异步返回订单id
     // 如果有效期间下单失败 返回null
-    public abstract CompletableFuture<String> trade(Order order, PriceBean position, TradeOptions options);
+    public abstract CompletableFuture<String> trade(OrderDto orderDto, KlineModule position, TradeOptions options);
 
 
     //取消订单

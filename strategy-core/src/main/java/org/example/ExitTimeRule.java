@@ -36,7 +36,7 @@ public class ExitTimeRule implements Rule {
 
     @Override
     public boolean isSatisfied(int i, TradingRecord tradingRecord) {
-        if (tradingRecord.getCurrentPosition() != null && tradingRecord.getCurrentPosition().isOpened()) {
+        if (tradingRecord!=null && tradingRecord.getCurrentPosition() != null && tradingRecord.getCurrentPosition().isOpened()) {
             Num pricePerAsset = tradingRecord.getCurrentPosition().getEntry().getPricePerAsset();
             int index = tradingRecord.getCurrentPosition().getEntry().getIndex();
             return i - index > indexNum && closePriceIndicator.getValue(i).isGreaterThan(pricePerAsset) && closePriceIndicator.getValue(i).isLessThan(pricePerAsset.multipliedBy(closePriceIndicator.getBarSeries().numOf(range)));

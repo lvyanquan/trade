@@ -18,7 +18,7 @@
 
 package org.example.rule;
 
-import org.example.enums.OrderSide;
+import org.example.model.enums.OrderSide;
 import org.ta4j.core.Rule;
 import org.ta4j.core.Trade;
 import org.ta4j.core.TradingRecord;

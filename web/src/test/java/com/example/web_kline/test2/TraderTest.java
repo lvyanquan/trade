@@ -19,7 +19,7 @@
 package com.example.web_kline.test2;
 
 import org.example.StrateFactory;
-import org.example.data.currency.CurrencyRegister;
+import org.example.model.currency.CurrencyRegister;
 import org.ta4j.core.Trade;
 
 import java.util.concurrent.atomic.AtomicBoolean;

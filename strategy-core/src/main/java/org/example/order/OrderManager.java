@@ -18,12 +18,34 @@
 
 package org.example.order;
 
-public abstract class OrderManager {
-    //是否有多单 或者空单
-    protected abstract boolean hasOpenOrder(String type);
+import org.example.client.dto.OrderDto;
+import org.example.client.dto.OrderQueryDto;
+import org.example.client.dto.OrderResponseInfo;
+import org.example.client.vo.OrderVo;
 
-    //订单是否成交
-    protected abstract boolean hasTrade(String id);
+import java.util.List;
+import java.util.Map;
 
+
+/**
+ * 搞一个服务一直监听订单信息 然后进行更新 大概是一个更好方式
+ * 这里的接口都是直接查询数据库即可
+ * 需要 进行数据库的设计即可
+ * <p>
+ * 钉钉推送这部分代码也调整好即可
+ */
+public interface OrderManager {
+    void init(Map<String,Object> parametres) throws Exception;
+
+    void createOrderVo(OrderDto orderDto);
+
+    OrderVo getOrderInfoById(OrderQueryDto orderDto);
+
+    //获取从某个时间段开始的所有订单 有效/已取消/已完成
+    //GET /api/v3/allOrders
+    List<OrderVo> getOrderVoList(OrderQueryDto orderQueryDto);
+
+
+    List<OrderResponseInfo> getOrderList(OrderQueryDto orderQueryDto);
 
 }

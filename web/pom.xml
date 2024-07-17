@@ -50,15 +50,21 @@
         </dependency>
 
 
-        <!--MySQL数据库驱动-->
         <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
+            <groupId>org.example</groupId>
+            <artifactId>strategy-core</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.example</groupId>
             <artifactId>kline_common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.example</groupId>
+            <artifactId>binance</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -98,11 +104,6 @@
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>com.aliyun</groupId>
-            <artifactId>alibaba-dingtalk-service-sdk</artifactId>
-            <version>2.0.0</version>
-        </dependency>
 
         <dependency>
             <groupId>mysql</groupId>

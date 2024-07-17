@@ -24,23 +24,22 @@ import org.ta4j.core.indicators.helpers.VolumeIndicator;
 import org.ta4j.core.num.Num;
 
 public class AverageVolumeIndicator extends AbstractIndicator<Num> {
-    VolumeIndicator volumeIndicator;
-    Num divided;
 
+    private final int length;
 
-    public AverageVolumeIndicator(BarSeries barSeries, int avergNum) {
-        super(barSeries);
-        this.volumeIndicator = new VolumeIndicator(barSeries, avergNum + 1);
-        this.divided = barSeries.numOf(avergNum);
+    public AverageVolumeIndicator(BarSeries series, int length) {
+        super(series);
+        this.length = length;
     }
 
-
     @Override
-    public Num getValue(int i) {
-        Num value = volumeIndicator.getValue(i);
-        if (i > 1) {
-            value = value.minus(volumeIndicator.getBarSeries().getBar(i).getVolume());
+    public Num getValue(int index) {
+        Num sum = numOf(0);
+        int actualLength = 0;
+        for (int i = Math.max(0, index - length + 1); i <= index; i++) {
+            sum = sum.plus(getBarSeries().getBar(i).getVolume());
+            actualLength++;
         }
-        return value.dividedBy(divided);
+        return actualLength > 0 ? sum.dividedBy(numOf(actualLength)) : sum;
     }
 }
