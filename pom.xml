@@ -12,7 +12,7 @@
         <module>web</module>
         <module>strategy-core</module>
         <module>binance</module>
-        <module>spot-client</module>
+        <module>engine</module>
     </modules>
 
     <properties>
