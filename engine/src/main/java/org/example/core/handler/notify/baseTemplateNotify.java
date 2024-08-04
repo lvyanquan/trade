@@ -50,7 +50,7 @@ public abstract class baseTemplateNotify implements Notify {
                 bar.getClosePrice(),
                 df.format(bar.getVolume()),
                 df.format( bar.getAmount()),
-                String.format("%.4f%%", bar.getAmplitude()),
+                String.format("%.4f%%", bar.getAmplitudePercent()),
                 String.format("%.4f%%", bar.getChangePercentage()));
 
         notify(msg);

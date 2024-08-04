@@ -38,6 +38,10 @@ public class BinanceSource extends KlineSource {
 
     public BinanceSource(String symbol, TradeType tradeType, KlineInterval interval) {
         super(symbol, tradeType, interval);
+        if(tradeType == TradeType.USDT_MARGINED_CONTRACT && interval == KlineInterval.ONE_SECOND && endTime <=0){
+            //u本位合约websocket实时数据最快也只支持分钟级别的，不支持秒级
+            throw new IllegalArgumentException("USDT_MARGINED_CONTRACT streaming data not support ONE_SECOND interval");
+        }
     }
 
     @Override
@@ -137,7 +141,7 @@ public class BinanceSource extends KlineSource {
                 }
                 , msg -> websocketClient.closeAllConnections(),
                 msg -> {
-                    System.out.println("出现异常,重新连接" + msg);
+                    LOG.info("Source [{}] connect error, retry...", symbol);
                     try {
                         Thread.sleep(5000L);
                     } catch (InterruptedException e) {
@@ -160,7 +164,7 @@ public class BinanceSource extends KlineSource {
                 }
                 , msg -> websocketClient.closeAllConnections(),
                 msg -> {
-                    System.out.println("出现异常,重新连接" + msg);
+                    LOG.info("Source [{}] connect error, retry...", symbol);
                     try {
                         Thread.sleep(5000L);
                     } catch (InterruptedException e) {

@@ -16,30 +16,31 @@
  * limitations under the License.
  */
 
-package org.example.indicators.volumn;
+package org.example.core.indicator.ta4j;
 
-import org.ta4j.core.BarSeries;
-import org.ta4j.core.indicators.AbstractIndicator;
-import org.ta4j.core.indicators.helpers.VolumeIndicator;
+import org.ta4j.core.indicators.CachedIndicator;
 import org.ta4j.core.num.Num;
 
-public class AverageVolumeIndicator extends AbstractIndicator<Num> {
+/**
+ * 平均值指标
+ */
+public class SimpleMovingAverageIndicator extends CachedIndicator<Num> {
+    private final CachedIndicator<Num> indicator;
+    private final int barCount;
 
-    private final int length;
-
-    public AverageVolumeIndicator(BarSeries series, int length) {
-        super(series);
-        this.length = length;
+    public SimpleMovingAverageIndicator(CachedIndicator<Num> indicator, int barCount) {
+        super(indicator);
+        this.indicator = indicator;
+        this.barCount = barCount;
     }
 
     @Override
-    public Num getValue(int index) {
+    protected Num calculate(int index) {
         Num sum = numOf(0);
-        int actualLength = 0;
-        for (int i = Math.max(0, index - length + 1); i <= index; i++) {
-            sum = sum.plus(getBarSeries().getBar(i).getVolume());
-            actualLength++;
+        int start = Math.max(0, index - barCount + 1);
+        for (int i = start; i <= index; i++) {
+            sum = sum.plus(indicator.getValue(i));
         }
-        return actualLength > 0 ? sum.dividedBy(numOf(actualLength)) : sum;
+        return sum.dividedBy(numOf(index - start + 1));
     }
 }

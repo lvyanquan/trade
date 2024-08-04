@@ -98,12 +98,16 @@ public class Bar {
         return amount;
     }
 
-    public double getAmplitude() {
+    public double getAmplitudePercent() {
         return (highPrice - lowPrice) / openPrice * 100;
     }
 
     public double getChangePercentage() {
-        return (closePrice - openPrice) / openPrice * 100;
+        return getChange() / openPrice * 100;
+    }
+
+    public double getChange() {
+        return closePrice - openPrice;
     }
 
     public Bar merge(Bar bar) {

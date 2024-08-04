@@ -140,7 +140,8 @@ public interface StrateFactory {
             Rule macdDeathCross = new CrossedDownCacheIndicatorRule(macdLine, macdIndicator).
                     and(new CrossedDownCacheIndicatorRule(emaIndicator, emaIndicator1));
             //金叉 快速线（DIF）白线突破了慢速线（DEA）黄线
-            Rule macdGoldenCross = new CrossedPushCacheIndicatorRule(macdLine, macdIndicator).and(new CrossedPushCacheIndicatorRule(emaIndicator, emaIndicator1));
+            Rule macdGoldenCross = new CrossedPushCacheIndicatorRule(macdLine, macdIndicator).
+                    and(new CrossedPushCacheIndicatorRule(emaIndicator, emaIndicator1));
 
             // Create a trading strategy
             BaseStrategy strategy = new BaseStrategy(
