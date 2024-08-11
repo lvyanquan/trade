@@ -20,6 +20,7 @@ package org.example.core.bar;
 
 import com.binance.connector.client.impl.SpotClientImpl;
 import com.binance.connector.client.impl.spot.Trade;
+import org.example.core.Constant;
 import org.example.core.order.BinanceGridTradingStats;
 import org.example.core.order.BinanceTradeJsonParse;
 import org.example.core.order.OrderResponseInfo;
@@ -29,16 +30,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 
 public class TradeRecordTest {
-
-    private String API_KEY = "";
-    private String SECRET_KEY = "";
-
+    Trade trade = new SpotClientImpl(Constant.API_KEY, Constant.SECRET_KEY).createTrade();
 
     @Test
     public void getOrders() throws Exception {
-
-        Trade trade = new SpotClientImpl(API_KEY, SECRET_KEY).createTrade();
-
 
         LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("symbol", "BTCUSDT");
@@ -49,12 +44,9 @@ public class TradeRecordTest {
 
         System.out.println(orderResponseInfos);
     }
+
     @Test
     public void getTrades() throws Exception {
-
-        Trade trade = new SpotClientImpl(API_KEY, SECRET_KEY).createTrade();
-
-
 
         LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("symbol", "BTCUSDT");
@@ -69,11 +61,7 @@ public class TradeRecordTest {
 
     @Test
     public void profile() throws Exception {
-
-        Trade trade = new SpotClientImpl(API_KEY, SECRET_KEY).createTrade();
         BinanceGridTradingStats binanceGridTradingStats = new BinanceGridTradingStats(trade);
-
-
         binanceGridTradingStats.calculateStats();
     }
 }

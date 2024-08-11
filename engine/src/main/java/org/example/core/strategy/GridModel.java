@@ -18,6 +18,7 @@
 
 package org.example.core.strategy;
 
+import org.example.core.Constant;
 import org.example.core.bar.BarEngineBuilder;
 import org.example.core.bar.BarPipeline;
 import org.example.core.bar.BaseBarExtend;
@@ -49,10 +50,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 //2748 初始仓位
 public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
-
-
-    private String API_KEY = "";
-    private String SECRET_KEY = "";
 
     String name;
 
@@ -108,8 +105,8 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
         this.gridNumber = gridNumber;
         this.gridAmount = gridAmount;
         this.symbol = symbol;
-        if (API_KEY != null) {
-            this.orderManager = new OrderManager(API_KEY, SECRET_KEY);
+        if (Constant.API_KEY != null) {
+            this.orderManager = new OrderManager(Constant.API_KEY, Constant.SECRET_KEY);
         } else {
             //mockOrderManager
         }
