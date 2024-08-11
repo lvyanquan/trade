@@ -39,6 +39,11 @@ public class MultipleSource extends KlineSource {
 
 
     @Override
+    public void close() {
+        klineSources.forEach(KlineSource::close);
+    }
+
+    @Override
     public void registerConsumer(Consumer<Bar> consumer) {
 
     }

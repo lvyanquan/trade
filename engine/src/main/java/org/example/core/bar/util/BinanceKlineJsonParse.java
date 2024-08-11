@@ -27,10 +27,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class BinanceJsonParse {
+public class BinanceKlineJsonParse {
     public static Bar parseStreamKline(String event, KlineInterval interval) {
         Map map = GsonUtil.GSON.fromJson(event, Map.class);
         Map<String, Object> data = (Map<String, Object>) map.get("k");
+        long createTime = Long.parseLong(map.get("E").toString());
         long closeTime = Long.parseLong(data.get("T").toString());
         long openTime = Long.parseLong(data.get("t").toString());
         Double o = Double.valueOf(data.get("o").toString());
@@ -43,6 +44,7 @@ public class BinanceJsonParse {
         return new Bar.Builder()
                 .timePeriod(interval.getChronoUnit().getDuration())
                 .endTime(DateUtil.conventToZonedDateTime(closeTime))
+                .createTime(DateUtil.conventToZonedDateTime(createTime))
                 .openPrice(o)
                 .highPrice(h)
                 .lowPrice(l)

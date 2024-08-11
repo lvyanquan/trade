@@ -23,7 +23,7 @@ import com.binance.connector.client.impl.WebsocketClientImpl;
 import com.binance.connector.futures.client.impl.UMFuturesClientImpl;
 import com.binance.connector.futures.client.impl.UMWebsocketClientImpl;
 import org.apache.commons.collections.CollectionUtils;
-import org.example.core.bar.util.BinanceJsonParse;
+import org.example.core.bar.util.BinanceKlineJsonParse;
 import org.example.core.bar.util.SpotKlineUtil;
 import org.example.core.bar.util.UmfutureKlineUtil;
 import org.example.core.util.DateUtil;
@@ -35,10 +35,14 @@ import java.util.List;
 public class BinanceSource extends KlineSource {
     private static final Logger LOG = LoggerFactory.getLogger(BinanceSource.class);
 
+    private UMWebsocketClientImpl umWebsocketClient;
+    private WebsocketClientImpl websocketClient;
+
+    private int connectionId;
 
     public BinanceSource(String symbol, TradeType tradeType, KlineInterval interval) {
         super(symbol, tradeType, interval);
-        if(tradeType == TradeType.USDT_MARGINED_CONTRACT && interval == KlineInterval.ONE_SECOND && endTime <=0){
+        if (tradeType == TradeType.USDT_MARGINED_CONTRACT && interval == KlineInterval.ONE_SECOND && endTime <= 0) {
             //u本位合约websocket实时数据最快也只支持分钟级别的，不支持秒级
             throw new IllegalArgumentException("USDT_MARGINED_CONTRACT streaming data not support ONE_SECOND interval");
         }
@@ -84,7 +88,8 @@ public class BinanceSource extends KlineSource {
                 LOG.info("Source [{}] start read streamIng data", symbol);
 
                 List<Bar> finalBars = bars;
-                streamData( finalBars, symbol, interval);
+                websocketClient = new WebsocketClientImpl();
+                streamData(websocketClient, finalBars, symbol, interval);
             } else if (CollectionUtils.isNotEmpty(bars)) {
                 processData(bars);
             }
@@ -116,7 +121,8 @@ public class BinanceSource extends KlineSource {
 
             if (endTime <= 0) {
                 LOG.info("start streaming data");
-                streamUmData( bars, symbol, interval);
+                umWebsocketClient = new UMWebsocketClientImpl();
+                streamUmData(umWebsocketClient, bars, symbol, interval);
             } else if (CollectionUtils.isNotEmpty(bars)) {
                 processData(bars);
             }
@@ -128,18 +134,19 @@ public class BinanceSource extends KlineSource {
 
     }
 
-    public void streamData( List<Bar> finalBars, String symbol, KlineInterval interval) {
-        WebsocketClientImpl websocketClient = new WebsocketClientImpl();
-        websocketClient.klineStream(symbol, interval.getInterval(), msg -> {
+    public void streamData(WebsocketClientImpl websocketClient, List<Bar> finalBars, String symbol, KlineInterval interval) {
+
+        connectionId = websocketClient.klineStream(symbol, interval.getInterval(), msg -> {
+                    LOG.info("Source [{}] connect receive open msg.", symbol);
                 },
                 (kline) -> {
                     if (CollectionUtils.isNotEmpty(finalBars)) {
                         processData(finalBars);
                         finalBars.clear();
                     }
-                    processData(BinanceJsonParse.parseStreamKline(kline, interval));
+                    processData(BinanceKlineJsonParse.parseStreamKline(kline, interval));
                 }
-                , msg -> websocketClient.closeAllConnections(),
+                , msg -> {},
                 msg -> {
                     LOG.info("Source [{}] connect error, retry...", symbol);
                     try {
@@ -147,22 +154,22 @@ public class BinanceSource extends KlineSource {
                     } catch (InterruptedException e) {
 //                          throw new RuntimeException(e);
                     }
-                    websocketClient.closeAllConnections();
-                    this.streamData( finalBars, symbol, interval);
+                    websocketClient.closeConnection(connectionId);
+                    this.streamData(websocketClient, finalBars, symbol, interval);
                 });
     }
 
-    public void streamUmData( List<Bar> finalBars, String symbol, KlineInterval interval) {
-        UMWebsocketClientImpl websocketClient = new UMWebsocketClientImpl();
-        websocketClient.klineStream(symbol, interval.getInterval(), msg -> {
+    public void streamUmData(UMWebsocketClientImpl umWebsocketClient, List<Bar> finalBars, String symbol, KlineInterval interval) {
+
+        connectionId = umWebsocketClient.klineStream(symbol, interval.getInterval(), msg -> {
                 }, (kline) -> {
                     if (CollectionUtils.isNotEmpty(finalBars)) {
                         processData(finalBars);
                         finalBars.clear();
                     }
-                    processData(BinanceJsonParse.parseStreamKline(kline, interval));
+                    processData(BinanceKlineJsonParse.parseStreamKline(kline, interval));
                 }
-                , msg -> websocketClient.closeAllConnections(),
+                , msg ->{},
                 msg -> {
                     LOG.info("Source [{}] connect error, retry...", symbol);
                     try {
@@ -170,9 +177,18 @@ public class BinanceSource extends KlineSource {
                     } catch (InterruptedException e) {
 //                          throw new RuntimeException(e);
                     }
-                    websocketClient.closeAllConnections();
-                    this.streamUmData( finalBars, symbol, interval);
+                    umWebsocketClient.closeConnection(connectionId);
+                    this.streamUmData(umWebsocketClient, finalBars, symbol, interval);
                 });
     }
 
+    @Override
+    public void close() {
+        if (umWebsocketClient != null) {
+            umWebsocketClient.closeAllConnections();
+        }
+        if (websocketClient != null) {
+            websocketClient.closeAllConnections();
+        }
+    }
 }

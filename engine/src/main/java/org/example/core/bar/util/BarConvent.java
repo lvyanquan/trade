@@ -18,6 +18,7 @@
 
 package org.example.core.bar.util;
 
+import org.example.core.bar.BaseBarExtend;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBar;
 import org.ta4j.core.num.DoubleNum;
@@ -25,7 +26,7 @@ import org.ta4j.core.num.DoubleNum;
 public class BarConvent {
     public static Bar convent(org.example.core.bar.Bar bar) {
 
-        Bar newBar = BaseBar.builder(DoubleNum::valueOf, Double.class)
+        return BaseBar.builder(DoubleNum::valueOf, Double.class)
                 .timePeriod(bar.getTimePeriod())
                 .endTime(bar.getEndTime())
                 .openPrice(bar.getOpenPrice())
@@ -35,6 +36,12 @@ public class BarConvent {
                 .volume(bar.getVolume())
                 .amount(bar.getAmount())
                 .build();
-        return newBar;
+    }
+
+    public static BaseBarExtend conventBaseBarExtend(org.example.core.bar.Bar bar) {
+
+        BaseBar newBar = (BaseBar)convent(bar);
+
+        return new BaseBarExtend(newBar,bar.getCreateTime());
     }
 }

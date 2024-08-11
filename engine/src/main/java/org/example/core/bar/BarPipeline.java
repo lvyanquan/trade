@@ -118,7 +118,7 @@ public class BarPipeline<V> implements Consumer<Bar> {
         }
     }
 
-    public static interface BarHandler<V> {
+    public  interface BarHandler<V> {
         default void open() {
         }
 

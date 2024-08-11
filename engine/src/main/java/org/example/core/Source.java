@@ -26,4 +26,6 @@ public interface Source<T> {
     void run();
 
     void registerConsumer(Consumer<T> consumer);
+
+    void close();
 }

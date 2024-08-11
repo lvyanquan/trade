@@ -22,6 +22,7 @@ import org.example.core.bar.Bar;
 import org.example.core.bar.TradeType;
 
 import java.text.DecimalFormat;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 public abstract class baseTemplateNotify implements Notify {
@@ -49,12 +50,27 @@ public abstract class baseTemplateNotify implements Notify {
                 bar.getLowPrice(),
                 bar.getClosePrice(),
                 df.format(bar.getVolume()),
-                df.format( bar.getAmount()),
+                df.format(bar.getAmount()),
                 String.format("%.4f%%", bar.getAmplitudePercent()),
                 String.format("%.4f%%", bar.getChangePercentage()));
 
         notify(msg);
     }
 
+    public void notifySignal(String symbol, TradeType tradeType, String exchangeName, String interVal, String indicatorName, ZonedDateTime time, boolean buy) {
+        String msg = String.format("币种: %s - %s - %s\n" +
+                "指标: %s\n" +
+                "买入: %s\n" +
+                "周期: %s\n" +
+                "更新时间: %s\n",
+                symbol,
+                tradeType.getChinaDescription(),
+                exchangeName,
+                indicatorName,
+                buy? "是" : "否",
+                interVal,
+                time.format(formatter));
+        notify(msg);
+    }
 
 }

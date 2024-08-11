@@ -27,6 +27,7 @@ import java.util.Objects;
 
 
 public class Bar {
+    private final ZonedDateTime createTime;
     private final ZonedDateTime beginTime;
     private final ZonedDateTime endTime;
     private final double openPrice;
@@ -38,7 +39,8 @@ public class Bar {
     private final Duration timePeriod;
 
 
-    private Bar(ZonedDateTime beginTime, ZonedDateTime endTime, Duration timePeriod, double openPrice, double highPrice, double lowPrice, double closePrice, double volume, double amount) {
+    private Bar(ZonedDateTime createTime, ZonedDateTime beginTime, ZonedDateTime endTime, Duration timePeriod, double openPrice, double highPrice, double lowPrice, double closePrice, double volume, double amount) {
+        this.createTime = createTime;
         this.beginTime = beginTime;
         this.endTime = endTime;
         this.openPrice = openPrice;
@@ -54,6 +56,11 @@ public class Bar {
         this.endTime = builder.endTime;
         this.timePeriod = builder.timePeriod;
         this.beginTime = builder.endTime.minus(builder.timePeriod).plus(1, ChronoUnit.MILLIS);
+        if (builder.createTime != null) {
+            this.createTime = builder.createTime;
+        } else {
+            this.createTime = this.beginTime;
+        }
         this.openPrice = builder.openPrice;
         this.highPrice = builder.highPrice;
         this.lowPrice = builder.lowPrice;
@@ -98,6 +105,10 @@ public class Bar {
         return amount;
     }
 
+    public ZonedDateTime getCreateTime() {
+        return createTime;
+    }
+
     public double getAmplitudePercent() {
         return (highPrice - lowPrice) / openPrice * 100;
     }
@@ -110,7 +121,9 @@ public class Bar {
         return closePrice - openPrice;
     }
 
+
     public Bar merge(Bar bar) {
+        ZonedDateTime newCreateTime = this.createTime.isBefore(bar.createTime) ? this.createTime : bar.createTime;
         ZonedDateTime newBeginTime = this.beginTime.isBefore(bar.beginTime) ? this.beginTime : bar.beginTime;
         ZonedDateTime newEndTime = this.endTime.isAfter(bar.endTime) ? this.endTime : bar.endTime;
         double newOpenPrice = this.beginTime.isBefore(bar.beginTime) ? this.openPrice : bar.openPrice;
@@ -121,7 +134,7 @@ public class Bar {
         double newAmount = this.amount + bar.amount;
         //更新持续时间
         Duration newTimePeriod = Duration.between(newBeginTime, newEndTime);
-        return new Bar(newBeginTime, newEndTime, newTimePeriod, newOpenPrice, newHighPrice, newLowPrice, newClosePrice, newVolume, newAmount);
+        return new Bar(newCreateTime,newBeginTime, newEndTime, newTimePeriod, newOpenPrice, newHighPrice, newLowPrice, newClosePrice, newVolume, newAmount);
     }
 
     @Override
@@ -172,6 +185,7 @@ public class Bar {
 
 
     public static class Builder {
+        private ZonedDateTime createTime;
         private ZonedDateTime endTime;
         private Duration timePeriod;
         private double openPrice;
@@ -180,6 +194,11 @@ public class Bar {
         private double closePrice;
         private double volume;
         private @Nullable double amount;
+
+        public Builder createTime(ZonedDateTime createTime) {
+            this.createTime = createTime;
+            return this;
+        }
 
         public Builder endTime(ZonedDateTime endTime) {
             this.endTime = endTime;

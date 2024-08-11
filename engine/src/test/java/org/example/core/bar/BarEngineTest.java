@@ -21,6 +21,7 @@ package org.example.core.bar;
 import org.example.core.bar.util.BarConvent;
 import org.example.core.handler.notify.DingTemplateNotify;
 import org.example.core.indicator.ta4j.SimpleMovingAverageIndicator;
+import org.example.core.util.DateUtil;
 import org.junit.Test;
 import org.ta4j.core.BaseBarSeries;
 import org.ta4j.core.indicators.ATRIndicator;
@@ -30,6 +31,8 @@ import org.ta4j.core.indicators.helpers.VolumeIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.DoubleNum;
 import org.ta4j.core.rules.CrossedUpIndicatorRule;
+
+import javax.naming.CompositeName;
 
 /**
  * 后期可以注册多个symbol。handler注册的时候，需要绑定对应的symbol
@@ -58,7 +61,7 @@ public class BarEngineTest {
                 .subscribe(ethSymbol)
                 .addHandler(ethSymbol, barHandler(ethSymbol, exchange))
 
-                .window(1)
+                .window(5)
                 .skipWindowData(1)
                 .build()
                 .run();
@@ -86,6 +89,8 @@ public class BarEngineTest {
             StandardDeviationIndicator volumeStdDev;
             CrossedUpIndicatorRule crossedUpIndicatorRule;
 
+            long systemTime;
+
 
             @Override
             public void open() {
@@ -101,6 +106,7 @@ public class BarEngineTest {
                 volumeStdDev = new StandardDeviationIndicator(volumeIndicator, period);
 
                 crossedUpIndicatorRule = new CrossedUpIndicatorRule(emaIndicatorShort, emaIndicatorLong);
+                systemTime = System.currentTimeMillis();
             }
 
             @Override
@@ -108,24 +114,61 @@ public class BarEngineTest {
                 baseBarSeries.addBar(bar, true);
                 windowDataApply = true;
                 int endIndex = baseBarSeries.getEndIndex();
+
+                if (systemTime - DateUtil.convent(baseBarSeries.getBar(endIndex).getEndTime()) > 0) {
+                    return;
+                }
+
                 if (crossedUpIndicatorRule.isSatisfied(endIndex)) {
-                    System.out.println(String.format("[%s] [%s]\\n %s周期策略：ema7金叉ema25",
+                    System.out.println(String.format("[%s] [%s] %s周期策略：ema7金叉ema25",
                             symbol,
-                            interValue,
-                            symbol, baseBarSeries.getBar(endIndex).getEndTime()));
+                            baseBarSeries.getBar(endIndex).getEndTime(),
+                            interValue));
+                    DingTemplateNotify.DEFAULT_NOTIFY.notifySignal(symbol,
+                            TradeType.USDT_MARGINED_CONTRACT,
+                            "binance",
+                            "15分钟",
+                            String.format("[%s] [%s] %s周期策略：ema7金叉ema25",
+                                    symbol,
+                                    baseBarSeries.getBar(endIndex).getEndTime(),
+                                    interValue),
+                            bar.getEndTime(),
+                            true);
                 }
                 double change = Math.abs(bar.getClosePrice().minus(bar.getClosePrice()).doubleValue());
                 if (change > atrIndicator.getValue(endIndex).doubleValue() * 2) {
-                    System.out.println(String.format("[%s] [%s]\\n %s周期策略：波动大于2倍atr",
+                    System.out.println(String.format("[%s] [%s] %s周期策略：波动大于2倍atr",
                             symbol,
-                            interValue,
-                            symbol, baseBarSeries.getBar(endIndex).getEndTime()));
+                            baseBarSeries.getBar(endIndex).getEndTime(),
+                            interValue));
+                    DingTemplateNotify.DEFAULT_NOTIFY.notifySignal(symbol,
+                            TradeType.USDT_MARGINED_CONTRACT,
+                            "binance",
+                            "15分钟",
+                            String.format("[%s] [%s] %s周期策略：波动大于2倍atr",
+                                    symbol,
+                                    baseBarSeries.getBar(endIndex).getEndTime(),
+                                    interValue),
+                            bar.getEndTime(),
+                            true);
                 }
-                if (volumeIndicator.getValue(endIndex).doubleValue() -( volumeSMA.getValue(endIndex).doubleValue() + volumeStdDev.getValue(endIndex).doubleValue() * 2) > 0) {
-                    System.out.println(String.format("[%s] [%s]\\n %s周期策略：成交量放大",
+                if (volumeIndicator.getValue(endIndex).doubleValue() - (volumeSMA.getValue(endIndex).doubleValue() + volumeStdDev.getValue(endIndex).doubleValue() * 2) > 0) {
+                    System.out.println(String.format("[%s] [%s] %s周期策略：成交量放大",
                             symbol,
-                            interValue,
-                            symbol, baseBarSeries.getBar(endIndex).getEndTime()));
+                            baseBarSeries.getBar(endIndex).getEndTime(),
+                            interValue
+                    ));
+                    DingTemplateNotify.DEFAULT_NOTIFY.notifySignal(symbol,
+                            TradeType.USDT_MARGINED_CONTRACT,
+                            "binance",
+                            "15分钟",
+                            String.format("[%s] [%s] %s周期策略：成交量放大",
+                                    symbol,
+                                    baseBarSeries.getBar(endIndex).getEndTime(),
+                                    interValue
+                            ),
+                            bar.getEndTime(),
+                            true);
                 }
             }
 
@@ -138,20 +181,26 @@ public class BarEngineTest {
                 } else {
                     baseBarSeries.addBar(bar, true);
                 }
-                double change = Math.abs(bar.getClosePrice().minus(bar.getClosePrice()).doubleValue());
-                if (change > atrIndicator.getValue(endIndex).doubleValue() * 2) {
-                    System.out.println(String.format("[%s] [%s]\\n %s周期策略：波动大于2倍atr",
-                            symbol,
-                            interValue,
-                            symbol, baseBarSeries.getBar(endIndex).getEndTime()));
-                }
-
-                if (volumeIndicator.getValue(endIndex).doubleValue() -( volumeSMA.getValue(endIndex).doubleValue() + volumeStdDev.getValue(endIndex).doubleValue() * 2) > 0) {
-                    System.out.println(String.format("[%s] [%s]\\n %s周期策略：成交量放大",
-                            symbol,
-                            interValue,
-                            symbol, baseBarSeries.getBar(endIndex).getEndTime()));
-                }
+//                double change = Math.abs(bar.getClosePrice().minus(bar.getClosePrice()).doubleValue());
+//                if (change > atrIndicator.getValue(endIndex).doubleValue() * 2) {
+//                    System.out.println(String.format("[%s] [%s] %s周期策略：波动大于2倍atr",
+//                            symbol,
+//                            baseBarSeries.getBar(endIndex).getEndTime(),
+//                            interValue));
+//                }
+//
+//                if (volumeIndicator.getValue(endIndex).doubleValue() -( volumeSMA.getValue(endIndex).doubleValue() + volumeStdDev.getValue(endIndex).doubleValue() * 2) > 0) {
+//                    System.out.println(String.format("[%s] [%s] %s周期策略：成交量放大",
+//                            symbol,
+//                            baseBarSeries.getBar(endIndex).getEndTime(),
+//                            interValue));
+//                }
+//                if (crossedUpIndicatorRule.isSatisfied(endIndex)) {
+//                    System.out.println(String.format("[%s] [%s] %s周期策略：ema7金叉ema25",
+//                            symbol,
+//                            baseBarSeries.getBar(endIndex).getEndTime(),
+//                            interValue));
+//                }
             }
         };
 
@@ -160,7 +209,7 @@ public class BarEngineTest {
                 TradeType.USDT_MARGINED_CONTRACT,
                 KlineInterval.ONE_MINUTE,
                 System.currentTimeMillis() - 24 * 60 * 60 * 1000,
-               -1
+                -1
         );
 
         new BarEngineBuilder<org.ta4j.core.Bar>()

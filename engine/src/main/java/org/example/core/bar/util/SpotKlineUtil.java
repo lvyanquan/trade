@@ -37,6 +37,6 @@ public class SpotKlineUtil {
         parameters.put("endTime", endTime);
         parameters.put("limit", limit);
         String result = client.createMarket().klines(parameters);
-        return BinanceJsonParse.parseHttpKline(result,interval);
+        return BinanceKlineJsonParse.parseHttpKline(result,interval);
     }
 }
