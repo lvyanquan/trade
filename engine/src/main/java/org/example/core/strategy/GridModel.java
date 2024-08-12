@@ -144,7 +144,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
             GridVo gridVo = JdbcTest.selectGridVo(name);
             if (gridVo != null) {
                 //必须是当天的才能更新，否则认为就过时了
-                if (Duration.between(gridVo.getUpdateTime().toLocalDateTime(),  LocalDateTime.now()).compareTo(Duration.ofHours(2)) <= 0) {
+                if (Duration.between(gridVo.getUpdateTime().toLocalDateTime(), LocalDateTime.now()).compareTo(Duration.ofHours(2)) <= 0) {
                     this.centralPrice = gridVo.getCentralPrice();
                     this.updateTime = gridVo.getUpdateTime().toLocalDateTime();
                 } else {
@@ -179,7 +179,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                 GridOrder gridOrder = new GridOrder(i, 0.00075, gridAmount);
                 //每个订单设置买入价格
                 //卖出价格 为买入价格 + atr *1.1 计算得出
-                gridOrder.setPriceAndCalcuteLowPrice(centralPrice - (downGridNumber - i) * (atrPrice * 2) - (downGridNumber * 0.1 <5?downGridNumber * 0.1:5) * atrPrice);
+                gridOrder.setPriceAndCalcuteLowPrice(centralPrice - (downGridNumber - i) * (atrPrice * 2) - (downGridNumber * 0.1 < 5 ? downGridNumber * 0.1 : 5) * atrPrice);
                 gridOrders.add(gridOrder);
 
                 if (orderMap.get(i) != null) {
@@ -291,7 +291,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                 if (!hasTrade) {
                     //第一次买入多单，构建多个单子即可
                     for (int i = nextBuyOrder.getSequnce(); i < nextBuyOrder.getSequnce() + firstTradeAmount && i < gridOrders.size(); i++) {
-                        boolean buy = buyOrder(i, bar.getClosePrice().doubleValue(),true);
+                        boolean buy = buyOrder(i, bar.getClosePrice().doubleValue(), true);
                         if (buy) {
                             hasTrade = true;
                         }
@@ -302,14 +302,8 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                     //这部分就不进行状态恢复了 后续再完善吧
                     //如果这段时间净买入单子数量的20%，就设置冷近期2小时 或者 triggerBuyTradePrice - 2.2*atr，满足就继续买入
                     if (buyContinues < gridNumber * 0.2) {
-                        buyOrder(nextBuyOrder.getSequnce(),bar.getClosePrice().doubleValue(), false);
-                       if(buyContinues > 2){
-                           buyContinues--;
-                           buyContinues--;
-                       }else{
-                           buyContinues = 0;
-                       }
-                        sellContinues = 0;
+                        buyOrder(nextBuyOrder.getSequnce(), bar.getClosePrice().doubleValue(), false);
+
                     } else {
                         System.out.println(String.format("连续交易次数为 %s,暂停交易", buyContinues));
                         if (forzenBuyTime <= 0) {
@@ -341,21 +335,27 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
             }
             nextSellOrder.setStatus(0);
             String clientId = name + "_" + nextSellOrder.getSequnce() + "_" + System.currentTimeMillis();
-            TradeUtil.orderLimitPingDuo(symbol.getSymbol(),
-                    sellPrice + 10,
-                    nextSellOrder.getQuantity(),
-                    2,
-                    clientId,
-                    orderManager.getTradeClient());
-
-            orderManager.insertNewOrder(new Order(clientId,
-                    symbol.getSymbol(),
-                    nextSellOrder.getSequnce(),
-                    sellPrice,
-                    nextSellOrder.getQuantity(),
-                    2));
-            sellContinues++;
-            buyContinues = 0;
+            Exception e2 = null;
+            try {
+                TradeUtil.orderLimitPingDuo(symbol.getSymbol(),
+                        sellPrice + 10,
+                        nextSellOrder.getQuantity(),
+                        2,
+                        clientId,
+                        orderManager.getTradeClient());
+            } catch (Exception e) {
+                e2 = e;
+            }
+            if (e2 == null) {
+                orderManager.insertNewOrder(new Order(clientId,
+                        symbol.getSymbol(),
+                        nextSellOrder.getSequnce(),
+                        sellPrice,
+                        nextSellOrder.getQuantity(),
+                        2));
+                sellContinues++;
+                buyContinues = 0;
+            }
             updateTriggerOrder();
         }
 
@@ -365,7 +365,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
     public void updateOrdersPrice() {
         int downGridNumber = Double.valueOf(gridNumber * 0.6D).intValue();
         for (int i = 0; i < gridNumber; i++) {
-            gridOrders.get(i).setPriceAndCalcuteLowPrice(centralPrice - (downGridNumber - i) * (atrPrice * 2) - (downGridNumber * 0.1 <5?downGridNumber * 0.1:5) * atrPrice);
+            gridOrders.get(i).setPriceAndCalcuteLowPrice(centralPrice - (downGridNumber - i) * (atrPrice * 2) - (downGridNumber * 0.1 < 5 ? downGridNumber * 0.1 : 5) * atrPrice);
 
         }
     }
@@ -444,6 +444,14 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                     gridOrder.getPrice(),
                     gridOrder.getQuantity(),
                     0));
+
+            if (buyContinues > 2) {
+                buyContinues--;
+                buyContinues--;
+            } else {
+                buyContinues = 0;
+            }
+            sellContinues = 0;
             return true;
         }
         return false;
@@ -452,7 +460,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
 
     private void print() {
         if (nextBuyOrder != null && nextSellOrder != null) {
-                String format = String.format("当前价格： %s, 当前触发买入价 ： %s, 当前触发卖出价 ： %s, centerPrice: %s, atr : %s, 当前网格最低点: %s,当前网格最高点: %s", closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue(), hasTrade ? nextBuyOrder.getPrice() : firstTradePrice, nextSellOrder.getLowPrice(), centralPrice, atrPrice,gridOrders.get(0).getPrice(),gridOrders.get(gridNumber - 1).getPrice());
+            String format = String.format("当前价格： %s, 当前触发买入价 ： %s, 当前触发卖出价 ： %s, centerPrice: %s, atr : %s, 当前网格最低点: %s,当前网格最高点: %s", closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue(), hasTrade ? nextBuyOrder.getPrice() : firstTradePrice, nextSellOrder.getLowPrice(), centralPrice, atrPrice, gridOrders.get(0).getPrice(), gridOrders.get(gridNumber - 1).getPrice());
             System.out.println(format);
         }
     }
