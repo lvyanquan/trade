@@ -9,9 +9,6 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
-        <module>web</module>
-        <module>strategy-core</module>
-        <module>binance</module>
         <module>engine</module>
     </modules>
 
