@@ -452,7 +452,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
 
     private void print() {
         if (nextBuyOrder != null && nextSellOrder != null) {
-                String format = String.format("当前价格： %s, 当前触发买入价 ： %s, 当前触发卖出价 ： %s, centerPrice: %s, atr : %s", closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue(), hasTrade ? nextBuyOrder.getPrice() : firstTradePrice, nextSellOrder.getLowPrice(), centralPrice, atrPrice);
+                String format = String.format("当前价格： %s, 当前触发买入价 ： %s, 当前触发卖出价 ： %s, centerPrice: %s, atr : %s, 当前网格最低点: %s,当前网格最高点: %s", closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue(), hasTrade ? nextBuyOrder.getPrice() : firstTradePrice, nextSellOrder.getLowPrice(), centralPrice, atrPrice,gridOrders.get(0).getPrice(),gridOrders.get(gridNumber - 1).getPrice());
             System.out.println(format);
         }
     }
