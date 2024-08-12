@@ -52,12 +52,13 @@ public class TradeUtil {
                     //
                 }
             }
-            throw new RuntimeException(e2);
         }
+        throw new RuntimeException(e2);
     }
 
 
     public static void orderLimitPingDuo(String symbol, double price, double quanlity, int pricePrecision, String clientId, Trade trade) {
+        Exception e2 = null;
         for (int i = 0; i < 3; i++) {
             try {
                 price = BigDecimal.valueOf(price).setScale(pricePrecision, RoundingMode.DOWN).doubleValue();
@@ -73,6 +74,7 @@ public class TradeUtil {
                 System.out.println("平多单" + result);
                 break;
             } catch (Exception e) {
+                e2 = e;
                 System.out.println("平多单失败重试：" + e.getMessage());
                 try {
                     Thread.sleep(2000L);
@@ -81,5 +83,6 @@ public class TradeUtil {
                 }
             }
         }
+        throw new RuntimeException(e2);
     }
 }

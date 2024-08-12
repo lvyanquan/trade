@@ -185,7 +185,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                 if (orderMap.get(i) != null) {
                     Order order = orderMap.get(i);
                     if (order.getOrderState() == OrderState.FILLED || order.getOrderState() == OrderState.PARTIALLY_FILLED) {
-                        gridOrder.setPrice(order.getPrice());
+                        gridOrder.setPriceAndCalcuteLowPrice(order.getAvgPrice());
                         gridOrder.setQuantity(order.getExecutedQuantity());
                         gridOrder.setStatus(1);
                     } else if (order.getOrderState() == OrderState.NEW) {
