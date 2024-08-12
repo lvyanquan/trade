@@ -42,7 +42,7 @@ public class TradeUtil {
                 parameters.put("price", price);
                 String result = trade.newOrder(parameters);
                 System.out.println("买入订单信息：" + result);
-                break;
+                return;
             } catch (Exception e) {
                 e2 = e;
                 System.out.println("买多单失败重试：" + e.getMessage());
@@ -72,7 +72,7 @@ public class TradeUtil {
                 parameters.put("price", price);
                 String result = trade.newOrder(parameters);
                 System.out.println("平多单" + result);
-                break;
+                return;
             } catch (Exception e) {
                 e2 = e;
                 System.out.println("平多单失败重试：" + e.getMessage());
