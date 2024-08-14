@@ -31,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class JdbcTest {
-    static String url = "jdbc:mysql://localhost:3306/dujie";
+    static String url = "jdbc:mysql://localhost:3306/trade";
     static String username = "root";
     static String password = "rootroot";
 

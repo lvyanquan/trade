@@ -19,16 +19,15 @@
 package org.example.core.strategy;
 
 import org.example.core.Constant;
-import org.example.core.bar.BarEngineBuilder;
-import org.example.core.bar.BarPipeline;
-import org.example.core.bar.BaseBarExtend;
-import org.example.core.bar.KlineSource;
+import org.example.core.bar.*;
 import org.example.core.bar.util.BarConvent;
 import org.example.core.order.Order;
 import org.example.core.order.OrderManager;
 import org.example.core.order.OrderState;
 import org.example.core.order.TradeUtil;
 import org.example.core.util.DateUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.ta4j.core.BaseBarSeries;
 import org.ta4j.core.indicators.ATRIndicator;
 import org.ta4j.core.indicators.EMAIndicator;
@@ -50,6 +49,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 //2748 初始仓位
 public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
+    private static final Logger LOG = LoggerFactory.getLogger(GridModel.class);
+
 
     String name;
 
@@ -99,6 +100,36 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
     private int buyContinues = 0;
 
     private long forzenBuyTime = 0;
+
+    public static void main(String[] args) throws Exception{
+
+        String symbol = "BTCUSDT";
+        String exchange = "binance";
+        BarEngineBuilder.SymbolDescribe btcSymbol = new BarEngineBuilder.SymbolDescribe(
+                symbol,
+                TradeType.SPOT,
+                KlineInterval.ONE_MINUTE,
+                System.currentTimeMillis() - 24 * 60 * 60 * 1000,
+                -1
+        );
+
+        GridModel gridModel = new GridModel("grid-01", 30, 60, btcSymbol);
+
+        new BarEngineBuilder<BaseBarExtend>()
+                .exchange(exchange)
+                .convert(BarConvent::conventBaseBarExtend)
+
+                .subscribe(btcSymbol)
+                .addHandler(btcSymbol, gridModel)
+
+                .window(45)
+                .skipWindowData(1)
+                .build()
+                .run();
+
+        Thread.currentThread().join();
+    }
+
 
     public GridModel(String name, int gridNumber, double gridAmount, BarEngineBuilder.SymbolDescribe symbol) {
         this.name = name;
@@ -163,7 +194,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                     gridAmount,
                     new Timestamp(System.currentTimeMillis()));
             JdbcTest.insertAndDeleteBeforeGridVo(newGridVo);
-            System.out.println("start grid... " + newGridVo);
+            LOG.info("start grid... " + newGridVo);
             //丁单薄的更新 最后加上下单操作即可上线了
             List<Order> orders = orderManager.selectAllWorkerOrder();
             HashMap<Integer, Order> orderMap = new HashMap<>();
@@ -222,7 +253,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                     () -> {
                         LocalDateTime now = LocalDateTime.now();
 
-                        if (Duration.between(updateTime, now).compareTo(Duration.ofHours(8)) >= 0) {
+                        if (Duration.between(updateTime, now).compareTo(Duration.ofHours(6)) >= 0) {
                             state.set(1);
                             this.centralPrice = emaIndicatorLong.getValue(barSeries.getEndIndex()).doubleValue();
                             this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
@@ -281,7 +312,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
             updateTriggerOrder();
         }
         if (state.get() != 2) {
-            System.out.println("更新中，暂时不交易");
+            LOG.info("更新中，暂时不交易");
             return;
         }
 
@@ -305,7 +336,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                         buyOrder(nextBuyOrder.getSequnce(), bar.getClosePrice().doubleValue(), false);
 
                     } else {
-                        System.out.println(String.format("连续交易次数为 %s,暂停交易", buyContinues));
+                        LOG.info(String.format("连续交易次数为 %s,暂停交易", buyContinues));
                         if (forzenBuyTime <= 0) {
                             forzenBuyTime = System.currentTimeMillis();
                         } else {
@@ -362,6 +393,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
     }
 
 
+    //todo  如果atr 和 centralPrice变更进行订单更新，此时已经下单持有的单子 卖出价格不应该更新
     public void updateOrdersPrice() {
         int downGridNumber = Double.valueOf(gridNumber * 0.6D).intValue();
         for (int i = 0; i < gridNumber; i++) {
@@ -405,8 +437,11 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
         for (int i = 0; i < gridNumber; i++) {
             GridOrder gridOrder = gridOrders.get(i);
             if (gridOrder.canSell()) {
-                tempnextSellOrder = gridOrders.get(i);
-                break;
+                if (tempnextSellOrder == null) {
+                    tempnextSellOrder = gridOrders.get(i);
+                } else {
+                    tempnextSellOrder = tempnextSellOrder.getPrice() < gridOrder.getPrice() ? tempnextSellOrder : gridOrder;
+                }
             }
         }
         //当前价格下方没有一个可以买入的网格点，所以价格置为-1，永远不会触发买入
@@ -461,7 +496,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
     private void print() {
         if (nextBuyOrder != null && nextSellOrder != null) {
             String format = String.format("当前价格： %s, 当前触发买入价 ： %s, 当前触发卖出价 ： %s, centerPrice: %s, atr : %s, 当前网格最低点: %s,当前网格最高点: %s", closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue(), hasTrade ? nextBuyOrder.getPrice() : firstTradePrice, nextSellOrder.getLowPrice(), centralPrice, atrPrice, gridOrders.get(0).getPrice(), gridOrders.get(gridNumber - 1).getPrice());
-            System.out.println(format);
+            LOG.info(format);
         }
     }
 }

@@ -48,6 +48,10 @@ public class GridOrder {
     }
 
     public void setPriceAndCalcuteLowPrice(double price) {
+        if(canSell() && price < this.price){
+            this.price = price;
+            return;
+        }
         this.price = price;
         this.lowPrice = calculateBreakEvenSellPrice(amount);
     }

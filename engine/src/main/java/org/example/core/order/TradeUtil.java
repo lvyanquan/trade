@@ -19,13 +19,16 @@
 package org.example.core.order;
 
 import com.binance.connector.client.impl.spot.Trade;
+import org.example.core.strategy.GridModel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.LinkedHashMap;
 
 public class TradeUtil {
-
+    private static final Logger LOG = LoggerFactory.getLogger(TradeUtil.class);
     public static void orderLimitDuo(String symbol, double price, double amount, int pricePrecision, int quantityPrecision, String clientId, Trade trade) {
        Exception e2 = null;
         for (int i = 0; i < 3; i++) {
@@ -41,11 +44,11 @@ public class TradeUtil {
                 parameters.put("quantity", BigDecimal.valueOf(amount / price).setScale(quantityPrecision, RoundingMode.DOWN));
                 parameters.put("price", price);
                 String result = trade.newOrder(parameters);
-                System.out.println("买入订单信息：" + result);
+                LOG.info("买入订单信息：" + result);
                 return;
             } catch (Exception e) {
                 e2 = e;
-                System.out.println("买多单失败重试：" + e.getMessage());
+                LOG.info("买多单失败重试：" + e.getMessage());
                 try {
                     Thread.sleep(3000L);
                 } catch (InterruptedException ex) {
@@ -71,11 +74,11 @@ public class TradeUtil {
                 parameters.put("quantity", quanlity);
                 parameters.put("price", price);
                 String result = trade.newOrder(parameters);
-                System.out.println("平多单" + result);
+                LOG.info("平多单" + result);
                 return;
             } catch (Exception e) {
                 e2 = e;
-                System.out.println("平多单失败重试：" + e.getMessage());
+                LOG.info("平多单失败重试：" + e.getMessage());
                 try {
                     Thread.sleep(2000L);
                 } catch (InterruptedException ex) {
