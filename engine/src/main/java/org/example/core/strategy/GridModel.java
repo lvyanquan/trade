@@ -66,6 +66,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
     //当前中心价格
     protected double centralPrice;
     protected double atrPrice;
+    private final double minAtrPrice = 200;
 
     //是否交易过
     protected boolean hasTrade = true;
@@ -101,7 +102,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
 
     private long forzenBuyTime = 0;
 
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) throws Exception {
 
         String symbol = "BTCUSDT";
         String exchange = "binance";
@@ -161,10 +162,12 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
             KlineSource historySOurce = new BarEngineBuilder<BaseBarExtend>()
                     .exchange("binance")
                     .subscribe(historySymbol)
+                    .window(10)
+                    .skipWindowData(1)
                     .convert(BarConvent::conventBaseBarExtend)
                     .addHandler(historySymbol, new BarPipeline.BarHandler<BaseBarExtend>() {
                         @Override
-                        public void apply(BaseBarExtend bar) {
+                        public void applyWindow(BaseBarExtend bar) {
                             barSeries.addBar(bar);
                         }
                     })
@@ -187,7 +190,10 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                 this.centralPrice = emaIndicatorLong.getValue(barSeries.getEndIndex()).doubleValue();
             }
             this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
-            this.firstTradePrice = centralPrice - 5 * atrPrice;
+            if (this.atrPrice < minAtrPrice) {
+                this.atrPrice = minAtrPrice;
+            }
+            this.firstTradePrice = centralPrice - 3 * atrPrice;
             GridVo newGridVo = new GridVo(name,
                     gridNumber,
                     centralPrice,
@@ -210,7 +216,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                 GridOrder gridOrder = new GridOrder(i, 0.00075, gridAmount);
                 //每个订单设置买入价格
                 //卖出价格 为买入价格 + atr *1.1 计算得出
-                gridOrder.setPriceAndCalcuteLowPrice(centralPrice - (downGridNumber - i) * (atrPrice * 2) - (downGridNumber * 0.1 < 5 ? downGridNumber * 0.1 : 5) * atrPrice);
+                gridOrder.setPriceAndCalcuteLowPrice(centralPrice - (downGridNumber - i) * (atrPrice) - ((downGridNumber- i) * 0.1 < 5 ? downGridNumber * 0.1 : 5) * atrPrice);
                 gridOrders.add(gridOrder);
 
                 if (orderMap.get(i) != null) {
@@ -257,6 +263,9 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                             state.set(1);
                             this.centralPrice = emaIndicatorLong.getValue(barSeries.getEndIndex()).doubleValue();
                             this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
+                            if (this.atrPrice < minAtrPrice) {
+                                this.atrPrice = minAtrPrice;
+                            }
                             this.updateTime = LocalDateTime.now();
 
                             JdbcTest.insertAndDeleteBeforeGridVo(new GridVo(name,
@@ -270,6 +279,9 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                         } else if (Duration.between(updateTime, now).compareTo(Duration.ofHours(4)) >= 0) {
                             state.set(1);
                             this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
+                            if (this.atrPrice < minAtrPrice) {
+                                this.atrPrice = minAtrPrice;
+                            }
                             this.updateTime = LocalDateTime.now();
                             updateOrdersPrice();
                             updateTriggerOrder();
@@ -359,7 +371,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
             //1 卖出操作
             //2 更新订单薄
             //如果这段时间连续卖出2单子，就设置触发价格为 3atr，满足就卖出
-            double sellPrice = Math.max(nextSellOrder.getLowPrice(), nextSellOrder.getPrice() + (atrPrice * 3));
+            double sellPrice = Math.max(nextSellOrder.getLowPrice(), nextSellOrder.getPrice() + (atrPrice * 1.5));
             sellPrice = Math.max(bar.getClosePrice().doubleValue(), sellPrice);
             if (sellContinues >= 2) {
                 sellPrice = sellPrice + atrPrice;
