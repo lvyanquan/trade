@@ -219,7 +219,7 @@ public class BarEngineTest {
                 .subscribe(btcSymbol)
                 .addHandler(btcSymbol, barBarHandler)
 
-                .window(15)
+                .window(45)
                 .skipWindowData(1)
                 .build()
                 .run();

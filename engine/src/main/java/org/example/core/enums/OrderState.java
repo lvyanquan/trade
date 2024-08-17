@@ -16,11 +16,9 @@
  * limitations under the License.
  */
 
-package org.example.core.order;
+package org.example.core.enums;
 
 public enum OrderState {
-
-
     NEW(0),
     PARTIALLY_FILLED(1),
     FILLED(2),

@@ -19,16 +19,12 @@
 package org.example.core.order;
 
 import com.binance.connector.client.impl.spot.Trade;
+import org.example.core.enums.OrderState;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
-
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class BinanceGridTradingStats {
@@ -42,7 +38,7 @@ public class BinanceGridTradingStats {
     public void calculateStats() {
         LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("symbol", "BTCUSDT");
-        parameters.put("limit", "100");
+        parameters.put("limit", "500");
 
         // 获取所有的订单
         List<OrderResponseInfo> orderResponseInfos = BinanceTradeJsonParse.parseOrders(trade.getOrders(parameters));

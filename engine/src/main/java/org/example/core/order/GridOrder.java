@@ -18,7 +18,9 @@
 
 package org.example.core.order;
 
-public class Order {
+import org.example.core.enums.OrderState;
+
+public class GridOrder {
     private String orderId;
     private String symbol;
 
@@ -38,7 +40,7 @@ public class Order {
 
     private int side;
 
-    public Order(String orderId, String symbol, int gridIndex, double avgPrice, double executedQuantity, OrderState orderState, int side) {
+    public GridOrder(String orderId, String symbol, int gridIndex, double avgPrice, double executedQuantity, OrderState orderState, int side) {
         this.orderId = orderId;
         this.symbol = symbol;
         this.gridIndex = gridIndex;
@@ -48,7 +50,7 @@ public class Order {
         this.side = side;
     }
 
-    public Order(String orderId, String symbol, int gridIndex, double price, double quantity, int side) {
+    public GridOrder(String orderId, String symbol, int gridIndex, double price, double quantity, int side) {
         this.orderId = orderId;
         this.symbol = symbol;
         this.gridIndex = gridIndex;

@@ -20,154 +20,166 @@ package org.example.core.order;
 
 import com.binance.connector.client.impl.SpotClientImpl;
 import com.binance.connector.client.impl.spot.Trade;
-import org.example.core.handler.notify.DingTemplateNotify;
 import org.example.core.strategy.JdbcTest;
+import org.example.core.util.GsonUtil;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 public class OrderManager {
-    //构建一个线程，每隔20s更新一次状态即可
 
-    private Consumer<Order> listener;
     private ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-    private Trade tradeClient;
+    private Trade trade;
 
     public OrderManager(String apiKey, String secretKey) {
-        this.tradeClient = new SpotClientImpl(apiKey, secretKey).createTrade();
-        init();
+        this.trade = new SpotClientImpl(apiKey, secretKey).createTrade();
+    }
+
+    public void init(long start, long end, String symbol) {
+        //删除 再insert
+        JdbcTest.deleteOrders(symbol, start, end);
+        JdbcTest.deleteTrades(symbol, start, end);
+        sync(start, end, symbol);
+        syncTrades(start, end, symbol);
+    }
+
+    public void streamingSync(List<String> symbols) {
         executor.scheduleWithFixedDelay(
                 () -> {
-                    List<Order> orders = selectNotTradeOrder();
-                    for (Order order : orders) {
-                        try {
-                            updateOrderAndNotify(order);
-                        } catch (Exception e) {
-                            System.out.println(e);
+                    for (String symbol : symbols) {
+                        BaseOrder lastOrder = JdbcTest.findLastOrder(symbol);
+                        if (lastOrder != null) {
+                            //数据库里查询最后一条数据
+                            sync(lastOrder.getTime() + 1, System.currentTimeMillis(), symbol);
+                        } else {
+                            //不存在就尝试加载最近7天内数据
+                            sync(System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000, System.currentTimeMillis(), symbol);
+                        }
+                    }
+                    for (String symbol : symbols) {
+                        org.example.core.order.Trade lastTrade = JdbcTest.findLastTrader(symbol);
+                        if (lastTrade != null) {
+                            //数据库里查询最后一条数据
+                            syncTrades(lastTrade.getTime() + 1, System.currentTimeMillis(), symbol);
+                        } else {
+                            //不存在就尝试加载最近7天内数据
+                            syncTrades(System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000, System.currentTimeMillis(), symbol);
                         }
                     }
                 },
-                10,
-                15,
+                0,
+                300,
                 TimeUnit.SECONDS);
     }
 
-    public void registerListener(Consumer<Order> listener) {
-        this.listener = listener;
-    }
+    //从某个时间点开始从头刷新订单
+    //[start,end]
+    private void sync(long start, long end, String symbol) {
+        LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("limit", "1000");
+        parameters.put("symbol", symbol);
 
-    public void init() {
-        for (Order order : selectAllWorkerOrder()) {
-            updateOrderAndNotify(order);
-        }
-    }
+        long currentStartTime = start;
+        long oneDayInMillis = 24 * 60 * 60 * 1000;  // 24小时的毫秒数
 
-    //从交易所获取订单数据
-    //部分成交的 要先取消
-    // 再查看所有的trader进行更新
-    public void updateOrderAndNotify(Order order) {
-        OrderResponseInfo orderResponseInfo = queryOrderFromExchange(order);
-        if(OrderState.NEW.name().equalsIgnoreCase(orderResponseInfo.getStatus() ) ){
-            return;
-        }
-        //如果是部分成交订单，先取消，再查询更新一次 取消失败还是取消成功 都在查询直接更新即可，更新失败，需要发送钉钉信息通知，正好看下部分成交不能取消还是取消之后，状态是取消还是部分成交
-        if (orderResponseInfo.getStatus().equals(OrderState.PARTIALLY_FILLED.name())) {
-            boolean success = cancelOrder(order);
-            if (!success) {
-                DingTemplateNotify.DEFAULT_NOTIFY.notify(orderResponseInfo.getClientOrderId() + " 取消失败\n, 触发取消原因：部分成交");
+        while (true) {
+            // 计算当前查询的endTime
+            long currentEndTime = currentStartTime + oneDayInMillis;
+            if (currentEndTime > end) {
+                currentEndTime = end;
             }
-            orderResponseInfo = queryOrderFromExchange(order);
-        }
-        //cancel等状态直接删除
-        //卖单成立 则删除此订单即可
-        //否则买单成立进行更新状态
-        OrderState orderState = OrderState.orderState(orderResponseInfo.getStatus());
-        if (orderState.isInvalid()) {
-            JdbcTest.deleteOrder(orderResponseInfo.getClientOrderId());
-        } else if (orderState == OrderState.PARTIALLY_FILLED || orderState == OrderState.FILLED) {
-            if ("BUY".equalsIgnoreCase(orderResponseInfo.getSide())) {
-                JdbcTest.updateOrder(orderResponseInfo.getClientOrderId(),
-                        orderResponseInfo.getCummulativeQuoteQty() / orderResponseInfo.getExecutedQty(),
-                        orderResponseInfo.getExecutedQty(),
-                        OrderState.orderState(orderResponseInfo.getStatus()).statue);
 
-            } else {
-                JdbcTest.deleteOrder(orderResponseInfo.getClientOrderId());
+            // 设置查询参数
+            parameters.put("startTime", currentStartTime);
+            parameters.put("endTime", currentEndTime);
+
+            // 调用 API 获取订单数据
+            List<Map<String, Object>> orderMap = GsonUtil.GSON.fromJson(trade.getOrders(parameters), List.class);
+
+            // 如果没有更多订单，有可能是这段时间内没有交易，所以还是要继续查找
+            if (orderMap == null || orderMap.isEmpty()) {
+                // 确保查询范围不重复，更新 startTime 为最后一个订单的时间戳 +1
+                currentStartTime = currentEndTime;
+                // 如果已经查询到指定的end时间点，结束循环
+                if (currentStartTime >= end) {
+                    break;
+                }
+                continue;
+            }
+
+            // 插入获取的订单数据到数据库
+            JdbcTest.insertOrders(orderMap);
+
+            // 更新当前的startTime，继续查询下一个时间段的订单
+            Map<String, Object> lastOrder = orderMap.get(orderMap.size() - 1);
+            long lastOrderTime = ((Number) lastOrder.get("time")).longValue();
+
+            // 确保查询范围不重复，更新 startTime 为最后一个订单的时间戳 +1
+            currentStartTime = lastOrderTime + 1;
+
+            // 如果已经查询到指定的end时间点，结束循环 查询范围是 [start,end]，binance接口返回的数据也是[start,end]，
+            // 所以这里需要判断是否超过end，而不是 >=
+            if (currentStartTime > end) {
+                break;
             }
         }
+    }
 
-        if (listener != null) {
-            Order newOrder = new Order(orderResponseInfo.getClientOrderId(),
-                    orderResponseInfo.getSymbol(),
-                    order.getGridIndex(),
-                    orderResponseInfo.getCummulativeQuoteQty() / orderResponseInfo.getExecutedQty(),
-                    orderResponseInfo.getExecutedQty(),
-                    OrderState.orderState(orderResponseInfo.getStatus()),
-                    "BUY".equalsIgnoreCase(orderResponseInfo.getSide()) ? 0 : 2);
-            listener.accept(newOrder);
+
+    private void syncTrades(long start, long end, String symbol) {
+        LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("limit", "1000");
+        parameters.put("symbol", symbol);
+
+        long currentStartTime = start;
+        long oneDayInMillis = 24 * 60 * 60 * 1000;  // 24小时的毫秒数
+
+        while (true) {
+            // 计算当前查询的endTime
+            long currentEndTime = currentStartTime + oneDayInMillis;
+            if (currentEndTime > end) {
+                currentEndTime = end;
+            }
+
+            // 设置查询参数
+            parameters.put("startTime", currentStartTime);
+            parameters.put("endTime", currentEndTime);
+
+            // 调用 API 获取交易数据
+            List<Map<String, Object>> tradeMap = GsonUtil.GSON.fromJson(trade.myTrades(parameters), List.class);
+
+            // 如果没有更多交易数据，有可能是这段时间内没有交易，所以还是要继续查找
+            if (tradeMap == null || tradeMap.isEmpty()) {
+                // 确保查询范围不重复，更新 startTime 为最后一个交易的时间戳 +1
+                currentStartTime = currentEndTime;
+                // 如果已经查询到指定的end时间点，结束循环
+                if (currentStartTime >= end) {
+                    break;
+                }
+                continue;
+            }
+
+            // 插入获取的交易数据到数据库
+            JdbcTest.insertTrades(tradeMap);
+
+            // 更新当前的startTime，继续查询下一个时间段的交易
+            Map<String, Object> lastTrade = tradeMap.get(tradeMap.size() - 1);
+            long lastTradeTime = ((Number) lastTrade.get("time")).longValue();
+
+            // 确保查询范围不重复，更新 startTime 为最后一个交易的时间戳 +1
+            currentStartTime = lastTradeTime + 1;
+
+            // 如果已经查询到指定的end时间点，结束循环 查询范围是 [start,end]，binance接口返回的数据也是[start,end]，
+            // 所以这里需要判断是否超过end，而不是 >=
+            if (currentStartTime > end) {
+                break;
+            }
         }
     }
 
 
-    public List<Order> selectNotTradeOrder() {
-        return JdbcTest.selectNotTradeOrder();
-    }
-
-    public boolean cancelOrder(Order order) {
-       for (int i = 0; i < 4; i++) {
-          try{
-              LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-              parameters.put("symbol", order.getSymbol());
-              parameters.put("origClientOrderId", order.getOrderId());
-              String s = tradeClient.cancelOrder(parameters);
-              System.out.println("cancel order response: " + s);
-              return true;
-          }catch (Exception e){
-                try {
-                    Thread.sleep(1000L);
-                } catch (InterruptedException ex) {
-                    //
-                }
-          }
-       }
-        return false;
-    }
-
-    public List<Order> selectAllWorkerOrder() {
-        return JdbcTest.selectAllWorkerOrder();
-    }
-
-    public void insertNewOrder(Order order) {
-        JdbcTest.insertAndDeleteBeforeOrder(order);
-    }
-
-    public OrderResponseInfo queryOrderFromExchange(Order order) {
-        Exception e = null;
-       for(int i = 0; i < 3; i++){
-          try{
-              LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
-              parameters.put("symbol", order.getSymbol());
-              parameters.put("origClientOrderId", order.getOrderId());
-              String orderString = tradeClient.getOrder(parameters);
-              return BinanceTradeJsonParse.parseOrder(orderString);
-          }catch (Exception e1){
-              e = e1;
-                try {
-                    Thread.sleep(1000L);
-                } catch (InterruptedException ex) {
-                    //
-                }
-
-          }
-       }
-        throw new RuntimeException(e);
-    }
-
-    public Trade getTradeClient() {
-        return tradeClient;
-    }
 }

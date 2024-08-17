@@ -18,17 +18,23 @@
 
 package org.example.core.strategy;
 
-import org.example.core.order.Order;
-import org.example.core.order.OrderState;
+import com.google.common.collect.Lists;
+import org.example.core.enums.Side;
+import org.example.core.order.BaseOrder;
+import org.example.core.order.GridOrder;
+import org.example.core.enums.OrderState;
+import org.example.core.order.Trade;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class JdbcTest {
     static String url = "jdbc:mysql://localhost:3306/trade";
@@ -66,7 +72,7 @@ public class JdbcTest {
     public static void insertAndDeleteBeforeGridVo(GridVo gridVo) {
         try {
             try (PreparedStatement statement = conn.prepareStatement("DELETE FROM trade.grid WHERE name = ?")) {
-                statement.setString(1,gridVo.getName());
+                statement.setString(1, gridVo.getName());
                 statement.execute();
             }
         } catch (SQLException e) {
@@ -87,12 +93,12 @@ public class JdbcTest {
         }
     }
 
-    public static List<Order> selectNotTradeOrder() {
+    public static List<GridOrder> selectNotTradeOrder() {
         String sql = "select * from trade.`virtualOrder` where status = 0";
         try {
             try (PreparedStatement statement = conn.prepareStatement(sql)) {
                 try (ResultSet resultSet = statement.executeQuery()) {
-                    ArrayList<Order> orderVos = new ArrayList<>();
+                    ArrayList<GridOrder> gridOrderVos = new ArrayList<>();
                     while (resultSet.next()) {
                         String id = resultSet.getString("id");
                         String symbol = resultSet.getString("symbol");
@@ -100,10 +106,10 @@ public class JdbcTest {
                         double avgPrice = resultSet.getDouble("avgPrice");
                         double executedQuantity = resultSet.getDouble("executedQuantity");
                         int orderSide = resultSet.getInt("side");
-                        Order orderVo = new Order(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.NEW, orderSide);
-                        orderVos.add(orderVo);
+                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.NEW, orderSide);
+                        gridOrderVos.add(gridOrderVo);
                     }
-                    return orderVos;
+                    return gridOrderVos;
                 }
 
             }
@@ -127,12 +133,12 @@ public class JdbcTest {
         }
     }
 
-    public static List<Order> selectAllWorkerOrder() {
+    public static List<GridOrder> selectAllWorkerOrder() {
         String sql = "select * from trade.`virtualOrder`";
         try {
             try (PreparedStatement statement = conn.prepareStatement(sql)) {
                 try (ResultSet resultSet = statement.executeQuery()) {
-                    ArrayList<Order> orderVos = new ArrayList<>();
+                    ArrayList<GridOrder> gridOrderVos = new ArrayList<>();
                     while (resultSet.next()) {
                         String id = resultSet.getString("id");
                         String symbol = resultSet.getString("symbol");
@@ -141,10 +147,10 @@ public class JdbcTest {
                         double executedQuantity = resultSet.getDouble("executedQuantity");
                         int orderSide = resultSet.getInt("side");
                         int status = resultSet.getInt("status");
-                        Order orderVo = new Order(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.orderState(status), orderSide);
-                        orderVos.add(orderVo);
+                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.orderState(status), orderSide);
+                        gridOrderVos.add(gridOrderVo);
                     }
-                    return orderVos;
+                    return gridOrderVos;
                 }
 
             }
@@ -155,7 +161,7 @@ public class JdbcTest {
 
     public static void deleteOrder(String id) {
         try {
-            try (PreparedStatement statement = conn.prepareStatement( "DELETE FROM trade.virtualOrder WHERE id = ?")) {
+            try (PreparedStatement statement = conn.prepareStatement("DELETE FROM trade.virtualOrder WHERE id = ?")) {
                 statement.setString(1, id);
                 statement.execute();
             }
@@ -165,293 +171,350 @@ public class JdbcTest {
     }
 
 
-    public static void insertAndDeleteBeforeOrder(Order order) {
-        int gridIndex = order.getGridIndex();
+    public static void insertAndDeleteBeforeOrder(GridOrder gridOrder) {
+        int gridIndex = gridOrder.getGridIndex();
         String sql = "DELETE FROM trade.virtualOrder WHERE gridIndex = ?";
         try {
             try (PreparedStatement statement = conn.prepareStatement(sql)) {
-                statement.setInt(1,gridIndex);
+                statement.setInt(1, gridIndex);
                 statement.execute();
             }
-            insertOrder(order);
+            insertOrder(gridOrder);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static void insertOrder(Order order) {
+    public static void insertOrder(GridOrder gridOrder) {
         String sql = "insert into trade.virtualOrder (id, symbol, gridIndex, price, quantity, side, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try {
             try (PreparedStatement statement = conn.prepareStatement(sql)) {
-                statement.setObject(1, order.getOrderId());
-                statement.setObject(2, order.getSymbol());
-                statement.setObject(3, order.getGridIndex());
-                statement.setObject(4, order.getPrice());
-                statement.setObject(5, order.getQuantity());
-                statement.setObject(6, order.getSide());
-                statement.setObject(7, order.getOrderState().getState());
+                statement.setObject(1, gridOrder.getOrderId());
+                statement.setObject(2, gridOrder.getSymbol());
+                statement.setObject(3, gridOrder.getGridIndex());
+                statement.setObject(4, gridOrder.getPrice());
+                statement.setObject(5, gridOrder.getQuantity());
+                statement.setObject(6, gridOrder.getSide());
+                statement.setObject(7, gridOrder.getOrderState().getState());
                 statement.execute();
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
-//
-//    public static void insertOrderMap(OrderDto orderDto, Connection conn) {
-//        String sql = "INSERT INTO trade.order_map (order_client_id_a, order_client_id_b) VALUES (?, ?)";
-//        try {
-//            try (PreparedStatement statement = conn.prepareStatement(sql)) {
-//                statement.setObject(1, orderDto.getVirtualId());
-//                statement.setObject(2, orderDto.getVirtualIdB());
-//                statement.execute();
-//            }
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
-//
-//    public static OrderVo selectOrderByExchangeOrderId(String id, Connection conn) {
-//
-//        try {  // JDBC连接信息
-//            // SQL语句
-//            String sql = "select order.id,order.exchange_order_id, order.exchange_id,order.qty,order.currency,order.order_status ,order.order_side,order.create_time,order.price,order.amount from trade.order  where exchange_order_id = ? ";
-//            // 创建Statement对象并执行SQL语句
-//            try (PreparedStatement statement = conn.prepareStatement(sql)) {
-//                statement.setObject(1, id);
-//                try (ResultSet resultSet = statement.executeQuery()) {
-//                    if (resultSet.next()) {
-//                        String clientId = resultSet.getString("id");
-//                        String exchangeOrderId = resultSet.getString("exchange_order_id");
-//                        int exchangeId = resultSet.getInt("exchange_id");
-//                        String currency = resultSet.getString("currency");
-//                        int orderStatus = resultSet.getInt("order_status");
-//                        String orderSide = resultSet.getString("order_side");
-//                        long createTime = resultSet.getLong("create_time");
-//                        double price = resultSet.getDouble("price");
-//                        double amount = resultSet.getDouble("amount");
-//                        double orderQty = resultSet.getDouble("qty");
-//                        String orderDetail = "select trade_id, price,qty,quote_qty, commission,trade_time from trade.order_detail  where exchange_order_id = ? ";
-//
-//                        try (PreparedStatement statement1 = conn.prepareStatement(orderDetail)) {
-//                            statement1.setObject(1, exchangeOrderId);
-//                            try (ResultSet resultSet1 = statement1.executeQuery()) {
-//                                ArrayList<TradeVo> tradeVos = new ArrayList<>();
-//                                while (resultSet1.next()) {
-//                                    double tradePrice = resultSet1.getDouble("price");
-//                                    String tradeId = resultSet1.getString("trade_id");
-//                                    double qty = resultSet1.getDouble("qty");
-//                                    double quoteQty = resultSet1.getDouble("quote_qty");
-//                                    double commission = resultSet1.getDouble("commission");
-//                                    long tradeTime = resultSet.getLong("trade_time");
-//
-//                                    TradeVo tradeVo = new TradeVo(tradeId, exchangeOrderId, tradePrice, qty, quoteQty, commission, tradeTime);
-//                                    tradeVos.add(tradeVo);
-//                                }
-//
-//                                if (tradeVos.isEmpty()) {
-//                                    //此时还未成交
-//                                    return new OrderVo(clientId, exchangeOrderId, Exchange.getExchange(exchangeId), CurrencyRegister.getCurrency(currency).get(), OrderStatus.getOrderStatus(orderStatus), OrderSide.valueOf(orderSide), createTime, orderQty, amount, price, null, 0, 0, 0);
-//
-//                                } else {
-//                                    double countQty = 0;
-//                                    double countQuoteQty = 0;
-//                                    double countCommion = 0;
-//                                    for (TradeVo tradeVo : tradeVos) {
-//                                        countQty += tradeVo.getQuantity();
-//                                        countQuoteQty += tradeVo.getAmount();
-//                                        countCommion += tradeVo.getCommission();
-//                                    }
-//
-//                                    return new OrderVo(clientId, exchangeOrderId, Exchange.getExchange(exchangeId), CurrencyRegister.getCurrency(currency).get(), OrderStatus.getOrderStatus(orderStatus), OrderSide.valueOf(orderSide), createTime, orderQty, amount, price, tradeVos, countQty, countQuoteQty, countCommion);
-//
-//                                }
-//                            }
-//                        }
-//
-//
-//                    }
-//                    return null;
-//                }
-//            }
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
-//
-//
-//    public static List<OrderVo> selectOrderList(OrderQueryDto orderQueryDto, Connection conn, CurrencyRegister currencyRegister) {
-//
-//        try {  // JDBC连接信息
-//            // SQL语句
-//            String sql = "select `order`.id,\n" +
-//                    "       `order`.exchange_order_id,\n" +
-//                    "       `order`.currency,\n" +
-//                    "       `order`.order_status,\n" +
-//                    "       `order`.order_side,\n" +
-//                    "       `order`.amount,\n" +
-//                    "       `order`.create_time,\n" +
-//                    "       `order`.qty as oqty,\n" +
-//                    "       od.trade_id,\n" +
-//                    "       od.price,\n" +
-//                    "       od.qty,\n" +
-//                    "       od.quote_qty,\n" +
-//                    "       od.trade_time,\n" +
-//                    "       od.commission" +
-//                    "       from  trade.`order` left join trade.order_detail od on `order`.id = od.order_id where 1= 1";
-//
-//            if (orderQueryDto != null) {
-//                if (orderQueryDto.getVirtualId() != null) {
-//                    sql += " and `order`.id like '" + orderQueryDto.getVirtualId() + "%'";
-//                }
-//                if (orderQueryDto.getExchangeOrderId() != null) {
-//                    sql += " and `order`.exchange_order_id = ?";
-//                }
-//                if (orderQueryDto.getCurrency() != null) {
-//                    sql += " and `order`.currency = ?";
-//                }
-//
-//                if (orderQueryDto.getOrderStatus() != null) {
-//                    String a = orderQueryDto.getOrderStatus().stream().map(OrderStatus::getStatus)
-//                            .map(String::valueOf) // 将Integer转换为String
-//                            .collect(Collectors.joining(","));
-//                    sql += " and `order`.order_status in (" + a + ")";
-//                }
-//
-//                if (orderQueryDto.getOrderSide() != null) {
-//                    String a = orderQueryDto.getOrderSide().stream().map(Enum::name).map(i -> "'" + i + "'")
-//                            .collect(Collectors.joining(","));
-//                    sql += " and `order`.order_side in (" + a + ")";
-//                }
-//
-//                if (orderQueryDto.getFromTime() > 0) {
-//                    sql += " and `order`.create_time >= ?";
-//                }
-//
-//                if (orderQueryDto.getEndTime() > 0) {
-//                    sql += " and `order`.create_time <= ?";
-//                }
-//            }
-//
-//            // 创建Statement对象并执行SQL语句
-//            try (PreparedStatement statement = conn.prepareStatement(sql)) {
-//
-//                int i = 0;
-//                if (orderQueryDto != null) {
-//
-//                    if (orderQueryDto.getExchangeOrderId() != null) {
-//                        i++;
-//                        statement.setObject(i, orderQueryDto.getExchangeOrderId());
-//                    }
-//                    if (orderQueryDto.getCurrency() != null) {
-//                        i++;
-//                        statement.setObject(i, orderQueryDto.getCurrency().symbol());
-//                    }
-//
-//
-//                    if (orderQueryDto.getFromTime() > 0) {
-//                        i++;
-//                        statement.setObject(i, orderQueryDto.getFromTime());
-//                    }
-//
-//                    if (orderQueryDto.getEndTime() > 0) {
-//                        i++;
-//                        statement.setObject(i, orderQueryDto.getEndTime());
-//                    }
-//                }
-//
-//                HashMap<String, OrderVo> orderMaps = new HashMap<>();
-//
-//                try (ResultSet resultSet = statement.executeQuery()) {
-//                    while (resultSet.next()) {
-//                        String clientId = resultSet.getString("id");
-//                        String exchangeOrderId = resultSet.getString("exchange_order_id");
-//                        String currency = resultSet.getString("currency");
-//                        int orderStatus = resultSet.getInt("order_status");
-//                        String orderSide = resultSet.getString("order_side");
-//                        //订单的币种下单数量
-//                        double orderQty = resultSet.getDouble("oqty");
-//                        long createTime = resultSet.getLong("create_time");
-//                        double price = resultSet.getDouble("price");
-//                        //订单的金额
-//                        double amount = resultSet.getDouble("amount");
-//                        OrderVo orderVo = null;
-//                        if (orderMaps.containsKey(clientId)) {
-//                            orderVo = orderMaps.get(clientId);
-//                        } else {
-//                            orderVo = new OrderVo(clientId, exchangeOrderId, Exchange.BINANCE, CurrencyRegister.getCurrency(currency).get(), OrderStatus.getOrderStatus(orderStatus), OrderSide.valueOf(orderSide), createTime, orderQty, amount, price, new ArrayList<>(), 0, 0, 0);
-//                            orderMaps.put(clientId, orderVo);
-//                        }
-//
-//                        String tradeId = resultSet.getString("trade_id");
-//                        double tradePrice = resultSet.getDouble("price");
-//                        double tradeQty = resultSet.getDouble("qty");
-//                        double tradeAmount = resultSet.getDouble("quote_qty");
-//                        double commission = resultSet.getDouble("commission");
-//                        long tradeTime = resultSet.getLong("trade_time");
-//
-//                        TradeVo tradeVo = new TradeVo(tradeId, exchangeOrderId, tradePrice, tradeQty, tradeAmount, commission, tradeTime);
-//                        orderVo.getTrades().add(tradeVo);
-//                        orderVo.setCommission(orderVo.getCommission() + tradeVo.getCommission());
-//                        orderVo.setTradeAmount(orderVo.getTradeAmount() + tradeAmount);
-//                        orderVo.setTradeQuantity(orderVo.getTradeQuantity() + tradeQty);
-//                    }
-//                    return new ArrayList<>(orderMaps.values());
-//                }
-//            }
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
-//
-//    public static void updateOrderCancel(String id) {
-//        //.getId(),orderResponseInfo.getExchangeOrderId(), orderResponseInfo.getOrderStatus()
-//        String sql = "update trade.order set order_status = ?  where id = ?";
-//        try {
-//            try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
-//                preparedStatement.setObject(1, OrderStatus.CANCEL);
-//                preparedStatement.setObject(2, id);
-//
-//                preparedStatement.execute();
-//            }
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
-//
-//    public static void updateOrderStatus(OrderResponseInfo orderResponseInfo) {
-//        //.getId(),orderResponseInfo.getExchangeOrderId(), orderResponseInfo.getOrderStatus()
-//        String sql = "update trade.order set order_status = ? , exchange_order_id =? ,qty = ? where id = ?";
-//        try {
-//            try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
-//                preparedStatement.setObject(1, orderResponseInfo.getOrderStatus().getStatus());
-//                preparedStatement.setObject(2, orderResponseInfo.getExchangeOrderId());
-//                preparedStatement.setObject(3, orderResponseInfo.getQuantity());
-//                preparedStatement.setObject(4, orderResponseInfo.getId());
-//
-//                preparedStatement.execute();
-//            }
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
-//
-//    public static void insertOrderDetail(TradeVo orderVo) {
-//        String sql = "INSERT INTO trade.order_detail (order_id,trade_id,exchange_order_id,price,quantity,amount,commission,trade_time) VALUES (?,?,?,?,?,?,?,?) ";
-//        try {
-//            try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
-//                preparedStatement.setObject(1, orderVo.getOrderId());
-//                preparedStatement.setObject(2, orderVo.getTradeId());
-//                preparedStatement.setObject(3, orderVo.getExchangeOrderId());
-//                preparedStatement.setObject(4, orderVo.getPrice());
-//                preparedStatement.setObject(5, orderVo.getQuantity());
-//                preparedStatement.setObject(6, orderVo.getAmount());
-//                preparedStatement.setObject(7, orderVo.getCommission());
-//                preparedStatement.setObject(8, orderVo.getTrade_time());
-//
-//                preparedStatement.execute();
-//            }
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
+
+
+    /**
+     * 查找所有未成交的订单
+     * NEW(0),
+     * PARTIALLY_FILLED(1)
+     *
+     * @return
+     */
+    public static List<BaseOrder> selectNotTradeOrders() {
+        return selectOrdersByStatus(Lists.newArrayList(OrderState.NEW.getState(), OrderState.PARTIALLY_FILLED.getState()));
+    }
+
+    /**
+     * 查找所有成交的订单
+     * PARTIALLY_FILLED(1)
+     * FILLED(2)
+     */
+    public static List<BaseOrder> selectTradeOrders() {
+        return selectOrdersByStatus(Lists.newArrayList(OrderState.FILLED.getState(), OrderState.PARTIALLY_FILLED.getState()));
+    }
+
+
+    public static List<BaseOrder> selectOrdersByStatus(List<Integer> orderStatus) {
+        String sql = "select * from trade.binance_orders where status in (%s)";
+
+        try {
+            try (PreparedStatement statement = conn.prepareStatement(String.format(sql, orderStatus.stream().map(i -> "?").collect(Collectors.joining(","))))) {
+                for (int i = 0; i < orderStatus.size(); i++) {
+                    statement.setInt(i + 1, orderStatus.get(i));
+                }
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    ArrayList<BaseOrder> baseOrders = new ArrayList<>();
+                    while (resultSet.next()) {
+                        Long orderId = resultSet.getLong("order_id");
+                        String symbol = resultSet.getString("symbol");
+                        String clientOrderId = resultSet.getString("client_order_id");
+                        BigDecimal price = resultSet.getBigDecimal("price");
+                        BigDecimal origQty = resultSet.getBigDecimal("orig_qty");
+                        BigDecimal executedQty = resultSet.getBigDecimal("executed_qty");
+                        BigDecimal cummulativeQuoteQty = resultSet.getBigDecimal("cummulative_quote_qty");
+                        OrderState status = OrderState.orderState(resultSet.getInt("status"));
+                        Side side = Side.side(resultSet.getInt("side"));
+                        Long time = resultSet.getLong("time");
+                        Long updateTime = resultSet.getLong("update_time");
+
+                        BaseOrder baseOrder = new BaseOrder(
+                                orderId,
+                                symbol,
+                                clientOrderId,
+                                price,
+                                origQty,
+                                executedQty,
+                                cummulativeQuoteQty,
+                                status,
+                                side,
+                                time,
+                                updateTime
+                        );
+                        baseOrders.add(baseOrder);
+                    }
+                    return baseOrders;
+                }
+
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    public static void insertOrders(List<Map<String, Object>> orders) {
+        String sql = "INSERT INTO binance_orders (order_id, symbol, order_list_id, client_order_id, price, orig_qty, executed_qty, " +
+                "cummulative_quote_qty, status, time_in_force, type, side, stop_price, iceberg_qty, time, update_time, " +
+                "is_working, orig_quote_order_qty, working_time, self_trade_prevention_mode) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            for (Map<String, Object> order : orders) {
+                initStateMent(statement, order);
+                statement.addBatch();
+            }
+            statement.executeBatch();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void insertOrder(Map<String, Object> order) {
+        String sql = "INSERT INTO binance_orders (order_id, symbol, order_list_id, client_order_id, price, orig_qty, executed_qty, " +
+                "cummulative_quote_qty, status, time_in_force, type, side, stop_price, iceberg_qty, time, update_time, " +
+                "is_working, orig_quote_order_qty, working_time, self_trade_prevention_mode) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            initStateMent(statement, order);
+            statement.execute();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    public static void initStateMent(PreparedStatement statement, Map order) throws SQLException {
+        statement.setLong(1, (Long) order.get("orderId"));
+        statement.setString(2, (String) order.get("symbol"));
+        statement.setLong(3, ((Number) order.get("orderListId")).longValue());
+        statement.setString(4, (String) order.get("clientOrderId"));
+        statement.setBigDecimal(5, new BigDecimal((String) order.get("price")));
+        statement.setBigDecimal(6, new BigDecimal((String) order.get("origQty")));
+        statement.setBigDecimal(7, new BigDecimal((String) order.get("executedQty")));
+        statement.setBigDecimal(8, new BigDecimal((String) order.get("cummulativeQuoteQty")));
+        statement.setInt(9, OrderState.orderState((String) order.get("status")).getState());
+        statement.setString(10, (String) order.get("timeInForce"));
+        statement.setString(11, (String) order.get("type"));
+        statement.setInt(12, Side.side((String) order.get("side")).getSide());
+        statement.setBigDecimal(13, new BigDecimal((String) order.get("stopPrice")));
+        statement.setBigDecimal(14, new BigDecimal((String) order.get("icebergQty")));
+        statement.setLong(15, ((Number) order.get("time")).longValue());
+        statement.setLong(16, ((Number) order.get("updateTime")).longValue());
+        statement.setBoolean(17, (Boolean) order.get("isWorking"));
+        statement.setBigDecimal(18, new BigDecimal((String) order.get("origQuoteOrderQty")));
+        statement.setLong(19, ((Number) order.get("workingTime")).longValue());
+        statement.setString(20, (String) order.get("selfTradePreventionMode"));
+
+    }
+
+    public static void deleteOrders(String symbol, long start, long end) {
+        String sql = "DELETE FROM binance_orders WHERE symbol = ? ";
+
+        // 如果 start 不为空，则添加时间范围的上限条件
+        if (start > 0) {
+            sql += " AND time >= ?";
+        }
+
+        // 如果 end 不为空，则添加时间范围的上限条件
+        if (end > 0) {
+            sql += " AND time <= ?";
+        }
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, symbol);
+
+            if (start > 0) {
+                statement.setLong(2, start);
+            }
+            if (end > 0) {
+                statement.setLong(3, end);
+            }
+            statement.execute();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error deleting orders: " + e.getMessage(), e);
+        }
+    }
+
+    public static void deleteTrades(String symbol, long start, long end) {
+        String sql = "DELETE FROM binance_trades WHERE symbol = ? ";
+
+        // 如果 start 不为空，则添加时间范围的上限条件
+        if (start > 0) {
+            sql += " AND time >= ?";
+        }
+
+        // 如果 end 不为空，则添加时间范围的上限条件
+        if (end > 0) {
+            sql += " AND time <= ?";
+        }
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, symbol);
+
+            if (start > 0) {
+                statement.setLong(2, start);
+            }
+            if (end > 0) {
+                statement.setLong(3, end);
+            }
+            statement.execute();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error deleting orders: " + e.getMessage(), e);
+        }
+    }
+
+
+    public static BaseOrder findLastOrder(String symbol) {
+        String sql = "SELECT * FROM binance_orders WHERE symbol = ? ORDER BY time DESC LIMIT 1";
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, symbol);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return new BaseOrder(
+                            resultSet.getLong("order_id"),
+                            resultSet.getString("symbol"),
+                            resultSet.getString("client_order_id"),
+                            resultSet.getBigDecimal("price"),
+                            resultSet.getBigDecimal("orig_qty"),
+                            resultSet.getBigDecimal("executed_qty"),
+                            resultSet.getBigDecimal("cummulative_quote_qty"),
+                            OrderState.orderState(resultSet.getInt("status")),  // 假设 OrderState 是一个枚举类型
+                            Side.side(resultSet.getInt("side")),          // 假设 Side 是一个枚举类型
+                            resultSet.getLong("time"),
+                            resultSet.getLong("update_time")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error finding last order: " + e.getMessage(), e);
+        }
+
+        return null;  // 如果没有找到任何订单，返回 null
+    }
+
+
+    //===========================================Trade================================================
+    // 批量插入 Trade 数据
+    public static void insertTrades(List<Map<String, Object>> trades) {
+        String sql = "INSERT INTO binance_trades (symbol, id, order_id, order_list_id, price, qty, quote_qty, commission, commission_asset, time, is_buyer, is_maker, is_best_match) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            for (Map<String, Object> trade : trades) {
+                statement.setString(1, (String) trade.get("symbol"));
+                statement.setLong(2, ((Number) trade.get("id")).longValue());
+                statement.setLong(3, ((Number) trade.get("orderId")).longValue());
+                statement.setLong(4, ((Number) trade.get("orderListId")).longValue());
+                statement.setBigDecimal(5, new BigDecimal((String) trade.get("price")));
+                statement.setBigDecimal(6, new BigDecimal((String) trade.get("qty")));
+                statement.setBigDecimal(7, new BigDecimal((String) trade.get("quoteQty")));
+                statement.setBigDecimal(8, new BigDecimal((String) trade.get("commission")));
+                statement.setString(9, (String) trade.get("commissionAsset"));
+                statement.setLong(10, ((Number) trade.get("time")).longValue());
+                statement.setBoolean(11, (Boolean) trade.get("isBuyer"));
+                statement.setBoolean(12, (Boolean) trade.get("isMaker"));
+                statement.setBoolean(13, (Boolean) trade.get("isBestMatch"));
+                statement.addBatch();
+            }
+            statement.executeBatch();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // 插入单个 Trade 数据
+    public static void insertOne(Map<String, Object> trade) {
+        String sql = "INSERT INTO binance_trades (symbol, id, order_id, order_list_id, price, qty, quote_qty, commission, commission_asset, time, is_buyer, is_maker, is_best_match) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, (String) trade.get("symbol"));
+            statement.setLong(2, ((Number) trade.get("id")).longValue());
+            statement.setLong(3, ((Number) trade.get("orderId")).longValue());
+            statement.setLong(4, ((Number) trade.get("orderListId")).longValue());
+            statement.setBigDecimal(5, new BigDecimal((String) trade.get("price")));
+            statement.setBigDecimal(6, new BigDecimal((String) trade.get("qty")));
+            statement.setBigDecimal(7, new BigDecimal((String) trade.get("quoteQty")));
+            statement.setBigDecimal(8, new BigDecimal((String) trade.get("commission")));
+            statement.setString(9, (String) trade.get("commissionAsset"));
+            statement.setLong(10, ((Number) trade.get("time")).longValue());
+            statement.setBoolean(11, (Boolean) trade.get("isBuyer"));
+            statement.setBoolean(12, (Boolean) trade.get("isMaker"));
+            statement.setBoolean(13, (Boolean) trade.get("isBestMatch"));
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Trade findLastTrader(String symbol) {
+        String sql = "SELECT * FROM binance_trades WHERE symbol = ? ORDER BY time DESC LIMIT 1";
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, symbol);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return createTrade(resultSet);
+                }
+                return null;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // 根据 orderId 查询对应的 Trade
+    public static List<Trade> selectTradesByOrderId(String orderId) {
+        String sql = "SELECT * FROM binance_trades WHERE order_id = ?";
+        List<Trade> trades = new ArrayList<>();
+
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, orderId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    trades.add(createTrade(resultSet));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return trades;
+    }
+
+    private static Trade createTrade(ResultSet resultSet) throws SQLException {
+        return new Trade(resultSet.getString("symbol"),
+                resultSet.getLong("id"),
+                resultSet.getLong("order_id"),
+                resultSet.getLong("order_list_id"),
+                resultSet.getBigDecimal("price"),
+                resultSet.getBigDecimal("qty"),
+                resultSet.getBigDecimal("quote_qty"),
+                resultSet.getBigDecimal("commission"),
+                resultSet.getString("commission_asset"),
+                resultSet.getLong("time"),
+                resultSet.getBoolean("is_buyer"),
+                resultSet.getBoolean("is_maker"),
+                resultSet.getBoolean("is_best_match"));
+    }
+
 }

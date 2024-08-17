@@ -16,36 +16,50 @@
  * limitations under the License.
  */
 
-package org.example.core.bar;
+package org.example.core.bar.binanceapi;
 
 import com.binance.connector.client.impl.SpotClientImpl;
 import com.binance.connector.client.impl.spot.Trade;
 import org.example.core.Constant;
-import org.example.core.order.BinanceGridTradingStats;
 import org.example.core.order.BinanceTradeJsonParse;
-import org.example.core.order.OrderManager;
 import org.example.core.order.OrderResponseInfo;
-import org.example.core.strategy.JdbcTest;
+import org.example.core.util.GsonUtil;
 import org.junit.Test;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-public class TradeRecordTest {
+public class OrderTest {
     Trade trade = new SpotClientImpl(Constant.API_KEY, Constant.SECRET_KEY).createTrade();
 
     @Test
-    public void profile() throws Exception {
-        BinanceGridTradingStats binanceGridTradingStats = new BinanceGridTradingStats(trade);
-        binanceGridTradingStats.calculateStats();
+    //返回的是[]区间
+    public void getOrders() throws Exception {
+
+        LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("symbol", "BTCUSDT");
+        parameters.put("limit", "10");
+        parameters.put("startTime", 1723810812155L);
+        parameters.put("endTime", 1723839577627L);
+        String s = trade.myTrades(parameters);
+        String trades = trade.myTrades(parameters);
+        System.out.println(trades);
     }
 
 
     @Test
-    public void selectOrder() throws Exception {
-        System.out.println(JdbcTest.selectNotTradeOrders());
-        System.out.println(JdbcTest.selectTradeOrders().size());
+    //返回的是[]区间
+    public void orders(){
+        LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("symbol", "BTCUSDT");
+        parameters.put("startTime", 1723810790926L);
+        parameters.put("endTime", 1723810790926L);
+        parameters.put("limit", "10");
+
+        // 获取所有的订单
+        List<Map<String, Object>> orderMap = GsonUtil.GSON.fromJson(trade.getOrders(parameters), List.class);
+        System.out.println(orderMap.get(0).get("time"));
+        System.out.println(orderMap.get(0).get("time"));
     }
-
-
 }
