@@ -67,8 +67,7 @@ public class GridOrder {
     }
 
 
-
-    public void updateCanSell(double quantity,double orderBuyPrice,double sellPrice,long buyTime) {
+    public void updateCanSell(double quantity, double orderBuyPrice, double sellPrice, long buyTime) {
         this.status = 2;
         this.quantity = quantity;
         this.orderBuyPrice = orderBuyPrice;
@@ -104,6 +103,12 @@ public class GridOrder {
 
     public void setTriggerSellPrice(double triggerSellPrice) {
         this.triggerSellPrice = triggerSellPrice;
+        this.lastBuyUpdateTime = System.currentTimeMillis();
+    }
+
+
+    public long getLastBuyUpdateTime() {
+        return lastBuyUpdateTime;
     }
 
     @Override

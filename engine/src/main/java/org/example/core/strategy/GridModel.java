@@ -26,7 +26,6 @@ import org.example.core.bar.*;
 import org.example.core.bar.util.BarConvent;
 import org.example.core.order.GridOrder;
 import org.example.core.order.GridOrderManager;
-import org.example.core.enums.OrderState;
 import org.example.core.order.TradeUtil;
 import org.example.core.strategy.grid.GridOrderBook;
 import org.example.core.util.DateUtil;
@@ -43,8 +42,6 @@ import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -72,13 +69,13 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     private final double minAtrPrice = 200;
 
     //是否交易过
-    protected boolean hasTrade = true;
+    protected boolean hasTrade = false;
 
     //初始化时，买入5个网格数量
     protected int firstTradeAmount = 3;
     protected double firstTradePrice;
 
-    //总金额上限
+    //每个网格交易的usdt仓位
     protected double gridAmount;
 
     protected LocalDateTime updateTime;
@@ -102,7 +99,6 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     private long forzenBuyTime = 0;
 
     public static void main(String[] args) throws Exception {
-
         String symbol = "BTCUSDT";
         String exchange = "binance";
         BarEngineBuilder.SymbolDescribe btcSymbol = new BarEngineBuilder.SymbolDescribe(
@@ -138,73 +134,34 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
         this.gridNumber = gridNumber;
         this.gridAmount = gridAmount;
         this.symbol = symbol;
+        this.barSeries = new BaseBarSeries(symbol.getSymbol(), DoubleNum::valueOf);
+        if (Constant.API_KEY != null) {
+            this.gridOrderManager = new GridOrderManager(Constant.API_KEY, Constant.SECRET_KEY);
+            gridOrderManager.registerListener(gridOrder -> {
+                gridOrderBook.update(gridOrder);
+                gridOrderBook.updateTriggerOrder(closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue());
+            });
+        } else {
+            //todo mockOrderManager 回测时用到
+        }
     }
 
     @Override
     public void open() {
-
         if (state.compareAndSet(0, 1)) {
-            barSeries = new BaseBarSeries(symbol.getSymbol(), DoubleNum::valueOf);
-            closePriceIndicator = new ClosePriceIndicator(barSeries);
-            //15分钟级别的交易，用最近72个小时的atr值做判断
-            atrIndicator = new ATRIndicator(barSeries, 48 * 4);
+            initBarseriesAndIndicator(barSeries);
 
-            //这个地方需要先从历史数据进行初始化
-            // 15分钟级别的交易，用最近4天的ema值做判断
-            emaIndicatorLong = new EMAIndicator(closePriceIndicator, 4 * 24 * 4);
-
-            //barSeries先初始化一定数量的k线数据
-            BarEngineBuilder.SymbolDescribe historySymbol = new BarEngineBuilder.SymbolDescribe(symbol.getSymbol(), symbol.getTradeType(), symbol.getInterval(), System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000, System.currentTimeMillis());
-            KlineSource historySOurce = new BarEngineBuilder<BaseBarExtend>()
-                    .exchange("binance")
-                    .subscribe(historySymbol)
-                    .window(10)
-                    .skipWindowData(1)
-                    .convert(BarConvent::conventBaseBarExtend)
-                    .addHandler(historySymbol, new BarPipeline.BarHandler<BaseBarExtend>() {
-                        @Override
-                        public void applyWindow(BaseBarExtend bar) {
-                            barSeries.addBar(bar);
-                        }
-                    })
-                    .build();
-            historySOurce.run();
-            historySOurce.close();
-            GridVo gridVo = JdbcTest.selectGridVo(name);
-            if (gridVo != null) {
-                //必须是当天的才能更新，否则认为就过时了
-                if (Duration.between(gridVo.getUpdateTime().toLocalDateTime(), LocalDateTime.now()).compareTo(Duration.ofHours(2)) <= 0) {
-                    this.centralPrice = gridVo.getCentralPrice();
-                    this.updateTime = gridVo.getUpdateTime().toLocalDateTime();
-                } else {
-                    this.centralPrice = emaIndicatorLong.getValue(barSeries.getEndIndex()).doubleValue();
-                }
-                this.gridNumber = gridVo.getGridNumber();
-                this.gridAmount = gridVo.getGridAmount();
-            } else {
-                this.centralPrice = emaIndicatorLong.getValue(barSeries.getEndIndex()).doubleValue();
-            }
+            this.centralPrice = emaIndicatorLong.getValue(barSeries.getEndIndex()).doubleValue();
             this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
             if (this.atrPrice < minAtrPrice) {
                 this.atrPrice = minAtrPrice;
             }
-            this.firstTradePrice = centralPrice - 3 * atrPrice;
-            GridVo newGridVo = new GridVo(name,
-                    gridNumber,
-                    centralPrice,
-                    gridAmount,
-                    new Timestamp(System.currentTimeMillis()));
-            JdbcTest.insertAndDeleteBeforeGridVo(newGridVo);
-            LOG.info("start grid... " + newGridVo);
-            this.gridOrderBook = new GridOrderBook(context.getAccountModel(), gridNumber, 0.6, centralPrice, atrPrice);
-
+            this.gridOrderBook = new GridOrderBook( context.getAccountModel(), gridNumber, 0.6, centralPrice, atrPrice);
+            gridOrderBook.revovery(gridOrderManager);
             //是否有持仓的单子即可
             this.hasTrade = !gridOrderBook.hasTrade();
+            this.firstTradePrice = centralPrice - 3 * atrPrice;
 
-            gridOrderManager.registerListener(order -> {
-                gridOrderBook.update(order);
-                updateTriggerOrder();
-            });
 
             //周期线程创建，进行更新操作逻辑
             //每个4小时更新一次 atr，就会更新一次丁单薄 对 gridOrders 进行一次循环，把买入价格更新下
@@ -219,22 +176,52 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                             update();
                             state.set(2);
                         } else if (Duration.between(updateTime, now).compareTo(Duration.ofHours(4)) >= 0) {
+                            state.set(1);
                             update();
+                            state.set(2);
                         }
                     },
                     0,
                     1,
                     TimeUnit.HOURS);
-
             state.set(2);
         }
+    }
+
+
+    private void initBarseriesAndIndicator(BaseBarSeries barSeries) {
+        //barSeries先初始化一定数量的k线数据
+        BarEngineBuilder.SymbolDescribe historySymbol = new BarEngineBuilder.SymbolDescribe(symbol.getSymbol(), symbol.getTradeType(), symbol.getInterval(), System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000, System.currentTimeMillis());
+        KlineSource historySOurce = new BarEngineBuilder<BaseBarExtend>()
+                .exchange("binance")
+                .subscribe(historySymbol)
+                .window(10)
+                .skipWindowData(1)
+                .convert(BarConvent::conventBaseBarExtend)
+                .addHandler(historySymbol, new BarPipeline.BarHandler<BaseBarExtend>() {
+                    @Override
+                    public void applyWindow(BaseBarExtend bar) {
+                        barSeries.addBar(bar);
+                    }
+                })
+                .build();
+        historySOurce.run();
+        historySOurce.close();
+
+        closePriceIndicator = new ClosePriceIndicator(barSeries);
+        //15分钟级别的交易，用最近48个小时的atr值做判断
+        atrIndicator = new ATRIndicator(barSeries, 48 * 4);
+        // 15分钟级别的交易，用最近4天的ema值做判断
+        emaIndicatorLong = new EMAIndicator(closePriceIndicator, 4 * 24 * 4);
+
     }
 
     @Override
     public void applyWindow(BaseBarExtend bar) {
         barSeries.addBar(bar, true);
         windowDataApply = true;
-
+        //todo 这个属于orderBook的内容吗
+        gridOrderBook.updateSellOrderPrice();
         //todo 打印当前的grid信息
         print();
     }
@@ -304,14 +291,14 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
         if (closePrice > gridOrderBook.getNextSellGridOrder().getTriggerSellPrice()
                 && closePrice > gridOrderBook.getNextSellGridOrder().getOrderBuyPrice()) {
             org.example.core.strategy.GridOrder nextSellGridOrder = gridOrderBook.getNextSellGridOrder();
-            if(!nextSellGridOrder.canSell()){
+            if (!nextSellGridOrder.canSell()) {
                 return;
             }
             nextSellGridOrder.updateTradIng();
             //1 卖出操作
             //2 更新订单薄
             //如果这段时间连续卖出2单子，就设置触发价格为 3atr，满足就卖出
-            double sellPrice =Math.max( gridOrderBook.getNextSellGridOrder().getTriggerSellPrice(),gridOrderBook.getNextSellGridOrder().getOrderBuyPrice());
+            double sellPrice = Math.max(gridOrderBook.getNextSellGridOrder().getTriggerSellPrice(), gridOrderBook.getNextSellGridOrder().getOrderBuyPrice());
             if (sellContinues >= 2) {
                 sellPrice = sellPrice + atrPrice;
             }
@@ -323,7 +310,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
             Exception e2 = null;
             try {
                 TradeUtil.orderLimitPingDuo(symbol.getSymbol(),
-                        sellPrice ,
+                        sellPrice,
                         quantity,
                         2,
                         clientId,
@@ -347,10 +334,6 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
 
     }
 
-
-    public void updateOrdersPrice() {
-        gridOrderBook.updateOrdersByCentralPrice(centralPrice,atrPrice);
-    }
 
     public void updateTriggerOrder() {
         gridOrderBook.updateTriggerOrder(closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue());
@@ -418,7 +401,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
 
     }
 
-    private void update(){
+    private void update() {
         this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
         if (this.atrPrice < minAtrPrice) {
             this.atrPrice = minAtrPrice;
@@ -428,8 +411,8 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                 gridNumber,
                 centralPrice,
                 gridAmount,
-                new Timestamp( DateUtil.convent(now))));
-        updateOrdersPrice();
+                new Timestamp(DateUtil.convent(now))));
+        gridOrderBook.updateOrdersByCentralPrice(centralPrice, atrPrice);
         updateTriggerOrder();
         this.updateTime = now;
     }

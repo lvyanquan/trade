@@ -22,20 +22,23 @@ import org.example.core.AccountModel;
 import org.example.core.Constant;
 import org.example.core.enums.OrderState;
 import org.example.core.order.GridOrderManager;
+import org.example.core.strategy.GridModel;
 import org.example.core.strategy.GridOrder;
 import org.example.core.util.ProceCalcuteUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 public class GridOrderBook {
+    private static final Logger LOG = LoggerFactory.getLogger(GridOrderBook.class);
     private int gridNumber;
     //网格比例，在中心价格下方的网格数量占据整体网格数量的百分比。默认下方占据60%，上方占据40%
     //后续这个比例可以根据价格在ema 120均线上方还是下方确定60% 还是 40%，强势时 下方40%，弱势时下方60%
     private double gridRatio = 0.6D;
 
-    private GridOrderManager gridOrderManager;
     private final ArrayList<GridOrder> gridGridOrders = new ArrayList<>(gridNumber);
 
     private double centralPrice;
@@ -54,13 +57,7 @@ public class GridOrderBook {
         this.accountModel = accountModel;
         this.gridNumber = gridNumber;
         this.gridRatio = gridRatio;
-        if (Constant.API_KEY != null) {
-            this.gridOrderManager = new GridOrderManager(Constant.API_KEY, Constant.SECRET_KEY);
-        } else {
-            //todo mockOrderManager 回归时用到
-        }
         updateOrdersByCentralPrice(centralPrice, atrPrice);
-        revovery();
     }
 
     public void updateOrdersByCentralPrice(double centralPrice, double atrPrice) {
@@ -77,7 +74,7 @@ public class GridOrderBook {
         }
     }
 
-    public void revovery() {
+    public void revovery(GridOrderManager gridOrderManager) {
         //丁单薄的更新 最后加上下单操作即可上线了
         List<org.example.core.order.GridOrder> gridOrders = gridOrderManager.selectAllWorkerOrder();
         HashMap<Integer, org.example.core.order.GridOrder> orderMap = new HashMap<>();
@@ -91,7 +88,7 @@ public class GridOrderBook {
 
     }
 
-    public GridOrder getOrder(int sequence){
+    public GridOrder getOrder(int sequence) {
         return gridGridOrders.get(sequence);
     }
 
@@ -172,7 +169,8 @@ public class GridOrderBook {
     public GridOrder getNextBuyGridOrder() {
         return nextBuyGridOrder;
     }
-    public GridOrder getUpCanBuyOrderByPrice(double closePrice){
+
+    public GridOrder getUpCanBuyOrderByPrice(double closePrice) {
         for (int i = 0; i < gridNumber; i++) {
             org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
             if (gridOrder.canBuy() && gridOrder.getTriggerBuyPrice() > closePrice) {
@@ -206,11 +204,17 @@ public class GridOrderBook {
         }
     }
 
-    // 如果超过24小时没有卖出，就尝试最小价格卖出
-    public double getlowSellPrice(GridOrder gridOrder) {
-        return ProceCalcuteUtil.calculateBreakEvenSellPrice(accountModel.getFeeRate(), gridOrder.getQuantity(), gridOrder.getQuantity() * gridOrder.getOrderBuyPrice(), 4);
+    // 如果超过12小时没有卖出，就尝试最小价格卖出
+    public void updateSellOrderPrice() {
+        for (int i = 0; i < gridNumber; i++) {
+            org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
+            if (gridOrder.canSell() && System.currentTimeMillis() - gridOrder.getLastBuyUpdateTime() > 12 * 60 * 60 * 1000) {
+                double sellPrice = ProceCalcuteUtil.calculateBreakEvenSellPrice(accountModel.getFeeRate(), gridOrder.getQuantity(), gridOrder.getQuantity() * gridOrder.getOrderBuyPrice(), 4);
+                LOG.info("订单超过12小时没有卖出，尝试最小价格卖出,订单Index {}, 从 {} 更新为 {}", gridOrder.getSequnce(), gridOrder.getTriggerSellPrice(), sellPrice);
+                gridOrder.setTriggerSellPrice(sellPrice);
+            }
+        }
     }
-
 
     public static class GridOrderBookMetric {
         private double triggerBuyPrice;
