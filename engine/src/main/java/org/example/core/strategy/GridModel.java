@@ -109,8 +109,11 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                 -1
         );
 
+        int gridNumber = 30;
+        double gridAmount = 60;
+
         GridModel gridModel = new GridModel("grid-01", 30, 60, btcSymbol);
-        TradeContext tradeContext = new TradeContext(new AccountModel(0.00075, 1800));
+        TradeContext tradeContext = new TradeContext(new AccountModel(0.00075, gridAmount * gridNumber));
         gridModel.initTradeContext(tradeContext);
 
         new BarEngineBuilder<BaseBarExtend>()
@@ -137,10 +140,6 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
         this.barSeries = new BaseBarSeries(symbol.getSymbol(), DoubleNum::valueOf);
         if (Constant.API_KEY != null) {
             this.gridOrderManager = new GridOrderManager(Constant.API_KEY, Constant.SECRET_KEY);
-            gridOrderManager.registerListener(gridOrder -> {
-                gridOrderBook.update(gridOrder);
-                gridOrderBook.updateTriggerOrder(closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue());
-            });
         } else {
             //todo mockOrderManager 回测时用到
         }
@@ -156,8 +155,13 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
             if (this.atrPrice < minAtrPrice) {
                 this.atrPrice = minAtrPrice;
             }
-            this.gridOrderBook = new GridOrderBook( context.getAccountModel(), gridNumber, 0.6, centralPrice, atrPrice);
+
+            this.gridOrderBook = new GridOrderBook(context.getAccountModel(), gridNumber, 0.6, centralPrice, atrPrice);
             gridOrderBook.revovery(gridOrderManager);
+            gridOrderManager.registerListener(gridOrder -> {
+                gridOrderBook.update(gridOrder);
+                gridOrderBook.updateTriggerOrder(closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue());
+            });
             //是否有持仓的单子即可
             this.hasTrade = !gridOrderBook.hasTrade();
             this.firstTradePrice = centralPrice - 3 * atrPrice;
