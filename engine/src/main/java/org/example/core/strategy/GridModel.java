@@ -168,7 +168,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                 gridOrderBook.updateTriggerOrder(closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue());
             });
             //是否有持仓的单子即可
-            this.hasTrade = !gridOrderBook.hasTrade();
+            this.hasTrade = gridOrderBook.hasTrade();
             this.firstTradePrice = centralPrice - 3 * atrPrice;
 
 
