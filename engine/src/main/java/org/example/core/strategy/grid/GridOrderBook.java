@@ -105,6 +105,7 @@ public class GridOrderBook {
         orderMap.forEach((k, v) -> {
             update(v);
         });
+        updateOrdersByCentralPrice(centralPrice, atrPrice);
         printOrder();
     }
 

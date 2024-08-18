@@ -50,7 +50,7 @@ public class OrderTest {
 
     @Test
     //返回的是[]区间
-    public void orders(){
+    public void orders() {
         LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("symbol", "BTCUSDT");
         parameters.put("startTime", 1723810790926L);
@@ -62,4 +62,21 @@ public class OrderTest {
         System.out.println(orderMap.get(0).get("time"));
         System.out.println(orderMap.get(0).get("time"));
     }
+
+    @Test
+    //返回的是[]区间
+    public void order() {
+        LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("symbol", "BTCUSDT");
+        parameters.put("origClientOrderId", "grid-01_19_1723293600242");
+
+//        parameters.put("startTime", 1723810790926L);
+//        parameters.put("endTime", 1723810790926L);
+//        parameters.put("limit", "10");
+
+        // 获取订单
+        System.out.println(trade.getOrder(parameters));
+
+    }
+
 }
