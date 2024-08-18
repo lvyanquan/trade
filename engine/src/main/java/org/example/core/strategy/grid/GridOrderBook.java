@@ -182,12 +182,13 @@ public class GridOrderBook {
 
 
     public GridOrderBookMetric getMetric() {
-        return new GridOrderBookMetric(nextBuyGridOrder == null ? -1 : nextBuyGridOrder.getTriggerBuyPrice(),
+        return new GridOrderBookMetric(
+                nextBuyGridOrder == null ? -1 : nextBuyGridOrder.getTriggerBuyPrice(),
                 nextSellGridOrder == null ? -1 : nextSellGridOrder.getTriggerBuyPrice(),
                 centralPrice,
                 atrPrice,
-                nextBuyGridOrder.getTriggerBuyPrice() - atrPrice,
-                nextBuyGridOrder.getTriggerBuyPrice() + atrPrice);
+                gridGridOrders.get(0).getOrderBuyPrice(),
+                gridGridOrders.get(gridGridOrders.size()-1).getOrderBuyPrice());
     }
 
 
