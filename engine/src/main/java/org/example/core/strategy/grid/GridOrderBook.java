@@ -123,7 +123,7 @@ public class GridOrderBook {
         if (order.getOrderState() == OrderState.FILLED || order.getOrderState() == OrderState.PARTIALLY_FILLED || (order.getOrderState() == OrderState.CANCELED && order.getExecutedQuantity() > 0)) {
             //买单成交，代表这个网格点可以卖出了
             if (order.getSide() == 0) {
-                gridOrder.updateCanSell(order.getExecutedQuantity(), order.getAvgPrice(), getTriggerSellPrice(gridOrder), order.getUpdateTime());
+                gridOrder.updateCanSell(order.getExecutedQuantity(), order.getAvgPrice(), getTriggerSellPrice(gridOrder, order.getAvgPrice()), order.getUpdateTime());
             } else if (order.getSide() == 2) {
                 //如果卖单成交，代表这个网格点可以买入了
                 gridOrder.updateCanBuy();
@@ -201,15 +201,15 @@ public class GridOrderBook {
 
 
     //centralPrice下方有几个网格点,卖出的价格应该是越往下，卖出的间距越高
-    public double getTriggerSellPrice(GridOrder gridOrder) {
+    public double getTriggerSellPrice(GridOrder gridOrder,double buyPrice) {
         //每个订单设置买入价格
         //卖出价格 为买入价格 + atr *1.1 计算得出
         int downGridNumber = Double.valueOf(gridNumber * gridRatio).intValue();
         if (downGridNumber - gridOrder.getSequnce() > 0) {
             double multity = (downGridNumber - gridOrder.getSequnce()) * 0.08 < 5 ? (downGridNumber - gridOrder.getSequnce()) * 0.08 : 5;
-            return gridOrder.getTriggerBuyPrice() + atrPrice + multity * atrPrice;
+            return buyPrice + atrPrice + multity * atrPrice;
         } else {
-            return gridOrder.getTriggerBuyPrice() + (atrPrice * 1.1);
+            return buyPrice + (atrPrice * 1.1);
         }
     }
 

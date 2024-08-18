@@ -114,10 +114,13 @@ public class GridOrder {
     @Override
     public String toString() {
         return "GridOrder{" +
-                "price=" + triggerBuyPrice +
-                ", sequnce=" + sequnce +
+                "sequnce=" + sequnce +
+                ", triggerBuyPrice=" + triggerBuyPrice +
+                ", orderBuyPrice=" + orderBuyPrice +
+                ", triggerSellPrice=" + triggerSellPrice +
                 ", quantity=" + quantity +
                 ", status=" + status +
+                ", lastBuyUpdateTime=" + lastBuyUpdateTime +
                 '}';
     }
 }

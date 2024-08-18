@@ -71,7 +71,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     //当前中心价格
     protected double centralPrice;
     protected double atrPrice;
-    private final double minAtrPrice = 200;
+    private final double minAtrPrice = 150;
 
     //是否交易过
     protected boolean hasTrade = false;
@@ -128,7 +128,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                 .subscribe(btcSymbol)
                 .addHandler(btcSymbol, gridModel)
 
-                .window(45)
+                .window(10)
                 .skipWindowData(1)
                 .build()
                 .run();
@@ -255,6 +255,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
         if (gridOrderBook.getNextBuyGridOrder() == null || gridOrderBook.getNextSellGridOrder() == null) {
             updateTriggerOrder();
         }
+        updateTriggerOrder();
 
         if (forzenBuyTime > 0 && System.currentTimeMillis() - forzenBuyTime > 2 * 60 * 60 * 1000) {
             forzenBuyTime = 0;
