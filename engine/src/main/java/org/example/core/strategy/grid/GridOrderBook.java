@@ -18,12 +18,14 @@
 
 package org.example.core.strategy.grid;
 
+import jdk.internal.net.http.common.Log;
 import org.example.core.AccountModel;
 import org.example.core.Constant;
 import org.example.core.enums.OrderState;
 import org.example.core.order.GridOrderManager;
 import org.example.core.strategy.GridModel;
 import org.example.core.strategy.GridOrder;
+import org.example.core.util.GsonUtil;
 import org.example.core.util.ProceCalcuteUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +87,7 @@ public class GridOrderBook {
         orderMap.forEach((k, v) -> {
             update(v);
         });
-
+        printOrder();
     }
 
     public GridOrder getOrder(int sequence) {
@@ -215,6 +217,10 @@ public class GridOrderBook {
                 gridOrder.setTriggerSellPrice(sellPrice);
             }
         }
+    }
+
+    public void printOrder(){
+        LOG.info("网格订单信息: {} ", GsonUtil.GSON.toJson(gridGridOrders));
     }
 
     public static class GridOrderBookMetric {
