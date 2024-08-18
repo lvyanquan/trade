@@ -388,13 +388,27 @@ public class JdbcTest {
     }
 
 
-    public static List<BaseOrder> findAllOrder(String symbol) {
-        String sql = "SELECT * FROM binance_orders WHERE symbol = ? ORDER BY time";
+    public static List<BaseOrder> findAllOrder(String symbol,long startTime,long endTime) {
+        String sql = "SELECT * FROM binance_orders WHERE symbol = ?";
+        // 如果 start 不为空，则添加时间范围的上限条件
+        if (startTime > 0) {
+            sql += " AND update_time >= ?";
+        }
 
+        // 如果 end 不为空，则添加时间范围的上限条件
+        if (endTime > 0) {
+            sql += " AND update_time <= ?";
+        }
+        sql += " ORDER BY time";
         ArrayList<BaseOrder> baseOrders = new ArrayList<>();
         try (PreparedStatement statement = conn.prepareStatement(sql)) {
             statement.setString(1, symbol);
-
+            if (startTime > 0) {
+                statement.setLong(2, startTime);
+            }
+            if (endTime > 0) {
+                statement.setLong(3, endTime);
+            }
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     baseOrders.add(new BaseOrder(

@@ -49,15 +49,17 @@ public class TradeRecordTest {
 
     @Test
     public void syncOrder() throws Exception {
-        new OrderManager(Constant.API_KEY, Constant.SECRET_KEY).init(System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000, System.currentTimeMillis(), "BTCUSDT");
+        new OrderManager(Constant.API_KEY, Constant.SECRET_KEY).init(System.currentTimeMillis() - 60L * 24 * 60 * 60 * 1000, System.currentTimeMillis(), "BTCUSDT");
     }
 
     @Test
     public void analyzeAllOrder() {
-//        new OrderManager(Constant.API_KEY, Constant.SECRET_KEY)
-//                .streamingSync(Lists.newArrayList("BTCUSDT"));
         // 从数据库加载数据，并创建 BaseOrder 和 Trade 实例列表
-        List<BaseOrder> orders = JdbcTest.findAllOrder("BTCUSDT");
+        //加上一个时间戳
+        long startTime = System.currentTimeMillis() - 74 * 60 * 60 * 1000;
+        long endTime = System.currentTimeMillis();
+
+        List<BaseOrder> orders = JdbcTest.findAllOrder("BTCUSDT", startTime, endTime);
 
         GridTradeAnalysis analysis = new GridTradeAnalysis("grid-01");
         analysis.analyzeOrders(orders);

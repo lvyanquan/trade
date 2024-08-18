@@ -35,6 +35,7 @@ public class GridTradeAnalysis {
     private Map<Integer, List<BaseOrder>> gridOrders = new HashMap<>();
     private List<TradeResult> tradeResults = new ArrayList<>();
     private List<BaseOrder> holdOn = new ArrayList<>();
+    private long orderNumbers = 0;
 
     private String stragegyId;
 
@@ -45,10 +46,17 @@ public class GridTradeAnalysis {
     // 从数据库中获取所有与 grid-01 策略相关的订单
     public void analyzeOrders(List<BaseOrder> orders) {
         for (BaseOrder order : orders) {
-            if (stragegyId != null && order.getClientOrderId().startsWith(stragegyId)) {
-                int gridIndex = extractGridIndex(order.getClientOrderId());
-                gridOrders.computeIfAbsent(gridIndex, k -> new ArrayList<>()).add(order);
-            }else{
+            if (order.getStatus().isInvalid()) {
+                continue;
+            }
+            if (stragegyId != null) {
+                if (order.getClientOrderId().startsWith(stragegyId)) {
+                    orderNumbers++;
+                    int gridIndex = extractGridIndex(order.getClientOrderId());
+                    gridOrders.computeIfAbsent(gridIndex, k -> new ArrayList<>()).add(order);
+                }
+            } else {
+                orderNumbers++;
                 gridOrders.computeIfAbsent(0, k -> new ArrayList<>()).add(order);
             }
         }
@@ -74,9 +82,6 @@ public class GridTradeAnalysis {
         BaseOrder buyOrder = null;
 
         for (BaseOrder order : orders) {
-            if (order.getStatus().isInvalid()) {
-                continue;
-            }
             if (order.getSide().equals(Side.BUY)) {
                 buyOrder = order;
             } else if (order.getSide().equals(Side.SELL) && buyOrder != null) {
@@ -115,7 +120,7 @@ public class GridTradeAnalysis {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // 最大和最小利润
-        if(!tradeResults.isEmpty()){
+        if (!tradeResults.isEmpty()) {
             TradeResult maxProfitTrade = Collections.max(tradeResults, Comparator.comparing(TradeResult::getProfit));
             TradeResult maxLossTrade = Collections.min(tradeResults, Comparator.comparing(TradeResult::getProfit));
 
@@ -129,6 +134,7 @@ public class GridTradeAnalysis {
 
             List<TradeResult> lossTradeList = tradeResults.stream().filter(result -> result.getProfit().compareTo(BigDecimal.ZERO) < 0).collect(Collectors.toList());
             // 输出结果
+            System.out.println("交易次数: " + orderNumbers);
             System.out.println("匹配交易成功的次数: " + matchedTrades);
             System.out.println("总利润: " + totalProfit);
             System.out.println("总净利润: " + totalNetProfit);
@@ -140,9 +146,9 @@ public class GridTradeAnalysis {
             System.out.println("盈利的交易次数: " + profitableTrades);
             System.out.println("亏损的交易次数: " + lossTrades);
             System.out.println("持有的订单数量: " + holdOn.size());
-            System.out.println("亏损的订单详情: " +  GsonUtil.GSON.toJson(lossTradeList));
+            System.out.println("亏损的订单详情: " + GsonUtil.GSON.toJson(lossTradeList));
             System.out.println("持有的订单: " + GsonUtil.GSON.toJson(holdOn));
-        }else{
+        } else {
             System.out.println("持有的订单数量: " + holdOn.size());
             System.out.println("持有的订单: " + GsonUtil.GSON.toJson(holdOn));
         }
