@@ -83,7 +83,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     //每个网格交易的usdt仓位
     protected double gridAmount;
 
-    protected LocalDateTime updateTime;
+    protected LocalDateTime updateTime =  LocalDateTime.now();
 
     protected ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
