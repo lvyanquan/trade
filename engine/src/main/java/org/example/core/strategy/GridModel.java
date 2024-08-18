@@ -190,7 +190,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                             state.set(2);
                         }
                     },
-                    0,
+                    1,
                     1,
                     TimeUnit.HOURS);
             state.set(2);
@@ -229,6 +229,9 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     public void applyWindow(BaseBarExtend bar) {
         barSeries.addBar(bar, true);
         windowDataApply = true;
+        if (System.currentTimeMillis() - DateUtil.convent(bar.getCreateTime()) > 3000) {
+            return;
+        }
         //todo 这个属于orderBook的内容吗
         gridOrderBook.updateSellOrderPrice();
         //todo 打印当前的grid信息
