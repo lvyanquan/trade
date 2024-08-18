@@ -74,24 +74,24 @@ public class GridOrderBook {
         //取买入单，价格最小的index，如果下方的index还有,那么判断两者之间差值，必须是在1个atr之外，如果较小，需要对下方的价格再减去这个差值
         gridGridOrders.stream().filter(GridOrder::canSell)
                 .min((a, b) -> a.getOrderBuyPrice() == b.getTriggerBuyPrice() ? 0 : a.getOrderBuyPrice() - b.getTriggerBuyPrice() > 0 ? 1 : -1).ifPresent(i -> {
-            int sequnce = i.getSequnce();
-            if (sequnce > 0) {
-                GridOrder gridOrder = gridGridOrders.get(sequnce - 1);
-                double minPrice =  0;
-                if (i.getOrderBuyPrice() - gridOrder.getTriggerBuyPrice() < 0.6 * atrPrice) {
-                    minPrice = 0.6 * atrPrice - (i.getOrderBuyPrice() - gridOrder.getTriggerBuyPrice());
-                }
-                if(minPrice > 0){
-                    //倒叙排序
-                    for(int index = 0;index <sequnce;index++){
-                        GridOrder gridOrder1 = gridGridOrders.get(index);
-                        if(gridOrder1.getSequnce() < i.getSequnce()){
-                            gridOrder1.updateTriggerPrice(gridOrder1.getTriggerBuyPrice() - minPrice);
+                    int sequnce = i.getSequnce();
+                    if (sequnce > 0) {
+                        GridOrder gridOrder = gridGridOrders.get(sequnce - 1);
+                        double minPrice = 0;
+                        if (i.getOrderBuyPrice() - gridOrder.getTriggerBuyPrice() < 0.6 * atrPrice) {
+                            minPrice = 0.6 * atrPrice - (i.getOrderBuyPrice() - gridOrder.getTriggerBuyPrice());
+                        }
+                        if (minPrice > 0) {
+                            //倒叙排序
+                            for (int index = 0; index < sequnce; index++) {
+                                GridOrder gridOrder1 = gridGridOrders.get(index);
+                                if (gridOrder1.getSequnce() < i.getSequnce()) {
+                                    gridOrder1.updateTriggerPrice(gridOrder1.getTriggerBuyPrice() - minPrice);
+                                }
+                            }
                         }
                     }
-                }
-            }
-        });
+                });
     }
 
     public void revovery(GridOrderManager gridOrderManager) {
@@ -232,6 +232,9 @@ public class GridOrderBook {
             org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
             if (gridOrder.canSell() && System.currentTimeMillis() - gridOrder.getLastBuyUpdateTime() > 12 * 60 * 60 * 1000) {
                 double sellPrice = ProceCalcuteUtil.calculateBreakEvenSellPrice(accountModel.getFeeRate(), gridOrder.getQuantity(), gridOrder.getQuantity() * gridOrder.getOrderBuyPrice(), 4);
+                if (sellPrice < gridOrder.getOrderBuyPrice()) {
+                    sellPrice = gridOrder.getOrderBuyPrice() + atrPrice * 0.8;
+                }
                 LOG.info("订单超过12小时没有卖出，尝试最小价格卖出,订单Index {}, 从 {} 更新为 {}", gridOrder.getSequnce(), gridOrder.getTriggerSellPrice(), sellPrice);
                 gridOrder.setTriggerSellPrice(sellPrice);
             }

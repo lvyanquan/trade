@@ -308,6 +308,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
             //2 更新订单薄
             //如果这段时间连续卖出2单子，就设置触发价格为 3atr，满足就卖出
             double sellPrice = Math.max(gridOrderBook.getNextSellGridOrder().getTriggerSellPrice(), gridOrderBook.getNextSellGridOrder().getOrderBuyPrice());
+            sellPrice = Math.max(sellPrice,closePrice);
             if (sellContinues >= 2) {
                 sellPrice = sellPrice + atrPrice;
             }
