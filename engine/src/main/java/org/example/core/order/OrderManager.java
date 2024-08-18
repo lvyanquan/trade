@@ -123,7 +123,7 @@ public class OrderManager {
 
             // 如果已经查询到指定的end时间点，结束循环 查询范围是 [start,end]，binance接口返回的数据也是[start,end]，
             // 所以这里需要判断是否超过end，而不是 >=
-            if (currentStartTime > end) {
+            if (currentStartTime > end || currentStartTime -end < 3000) {
                 break;
             }
         }

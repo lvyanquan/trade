@@ -416,11 +416,6 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
             this.atrPrice = minAtrPrice;
         }
         LocalDateTime now = LocalDateTime.now();
-        JdbcTest.insertAndDeleteBeforeGridVo(new GridVo(name,
-                gridNumber,
-                centralPrice,
-                gridAmount,
-                new Timestamp(DateUtil.convent(now))));
         gridOrderBook.updateOrdersByCentralPrice(centralPrice, atrPrice);
         updateTriggerOrder();
         this.updateTime = now;

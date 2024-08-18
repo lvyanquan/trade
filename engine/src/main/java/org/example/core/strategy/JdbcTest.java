@@ -107,7 +107,7 @@ public class JdbcTest {
                         double executedQuantity = resultSet.getDouble("executedQuantity");
                         int orderSide = resultSet.getInt("side");
                         long updateTime = resultSet.getLong("updateTime");
-                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.NEW, orderSide,updateTime);
+                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.NEW, orderSide, updateTime);
                         gridOrderVos.add(gridOrderVo);
                     }
                     return gridOrderVos;
@@ -149,7 +149,7 @@ public class JdbcTest {
                         int orderSide = resultSet.getInt("side");
                         int status = resultSet.getInt("status");
                         long updateTime = resultSet.getLong("updateTime");
-                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.orderState(status), orderSide,updateTime);
+                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.orderState(status), orderSide, updateTime);
                         gridOrderVos.add(gridOrderVo);
                     }
                     return gridOrderVos;
@@ -385,6 +385,38 @@ public class JdbcTest {
         } catch (SQLException e) {
             throw new RuntimeException("Error deleting orders: " + e.getMessage(), e);
         }
+    }
+
+
+    public static List<BaseOrder> findAllOrder(String symbol) {
+        String sql = "SELECT * FROM binance_orders WHERE symbol = ? ORDER BY time";
+
+        ArrayList<BaseOrder> baseOrders = new ArrayList<>();
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, symbol);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    baseOrders.add(new BaseOrder(
+                            resultSet.getLong("order_id"),
+                            resultSet.getString("symbol"),
+                            resultSet.getString("client_order_id"),
+                            resultSet.getBigDecimal("price"),
+                            resultSet.getBigDecimal("orig_qty"),
+                            resultSet.getBigDecimal("executed_qty"),
+                            resultSet.getBigDecimal("cummulative_quote_qty"),
+                            OrderState.orderState(resultSet.getInt("status")),  // 假设 OrderState 是一个枚举类型
+                            Side.side(resultSet.getInt("side")),          // 假设 Side 是一个枚举类型
+                            resultSet.getLong("time"),
+                            resultSet.getLong("update_time")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error finding last order: " + e.getMessage(), e);
+        }
+
+        return baseOrders;  // 如果没有找到任何订单，返回 null
     }
 
 
