@@ -187,8 +187,8 @@ public class GridOrderBook {
                 nextSellGridOrder == null ? -1 : nextSellGridOrder.getTriggerBuyPrice(),
                 centralPrice,
                 atrPrice,
-                gridGridOrders.get(0).getOrderBuyPrice(),
-                gridGridOrders.get(gridGridOrders.size()-1).getOrderBuyPrice());
+                gridGridOrders.get(0).getTriggerBuyPrice(),
+                gridGridOrders.get(gridGridOrders.size()-1).getTriggerBuyPrice());
     }
 
 
