@@ -159,28 +159,15 @@ public class GridOrderBook {
         }
     }
 
-    //找到买入价格最低的一次成交记录，作为卖出价格触发
-    //如果没有的话 就是当前价格最近的上方单子,有可能这个单子没持有。没货卖
+    //卖出价格最低的一个
     public void updateSellOrder() {
-        org.example.core.strategy.GridOrder tempnextSellGridOrder = null;
-        for (int i = 0; i < gridNumber; i++) {
-            org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
-            if (gridOrder.canSell()) {
-                if (tempnextSellGridOrder == null) {
-                    tempnextSellGridOrder = gridGridOrders.get(i);
-                } else {
-                    tempnextSellGridOrder = tempnextSellGridOrder.getTriggerBuyPrice() < gridOrder.getTriggerBuyPrice() ? tempnextSellGridOrder : gridOrder;
-                }
-            }
-        }
-        //当前价格下方没有一个可以买入的网格点，所以价格置为-1，永远不会触发买入
-        //只有等到有卖出了，即价格回到网格范围内，才会重新更新 或者centerPrice变更，价格回到网格范围内
-        if (tempnextSellGridOrder == null) {
-            nextSellGridOrder = new org.example.core.strategy.GridOrder(-1);
-            nextSellGridOrder.setTriggerSellPrice(10000000000d);
-        } else {
-            nextSellGridOrder = tempnextSellGridOrder;
-        }
+        nextSellGridOrder = gridGridOrders.stream().filter(GridOrder::canSell)
+                .min((a, b) -> Double.valueOf(a.getTriggerSellPrice() - b.getTriggerSellPrice()).intValue())
+                .orElseGet(()->{
+                    GridOrder gridOrder = new GridOrder(-1);
+                    gridOrder.setTriggerSellPrice(10000000000d);
+                    return gridOrder;
+                });
     }
 
     public GridOrder getNextSellGridOrder() {
@@ -205,7 +192,7 @@ public class GridOrderBook {
     public GridOrderBookMetric getMetric() {
         return new GridOrderBookMetric(
                 nextBuyGridOrder == null ? -1 : nextBuyGridOrder.getTriggerBuyPrice(),
-                nextSellGridOrder == null ? -1 : nextSellGridOrder.getTriggerBuyPrice(),
+                nextSellGridOrder == null ? -1 : nextSellGridOrder.getTriggerSellPrice(),
                 centralPrice,
                 atrPrice,
                 gridGridOrders.get(0).getTriggerBuyPrice(),
