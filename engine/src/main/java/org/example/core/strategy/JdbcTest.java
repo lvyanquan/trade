@@ -188,7 +188,7 @@ public class JdbcTest {
     }
 
     public static void insertOrder(GridOrder gridOrder) {
-        String sql = "insert into trade.virtualOrder (id, symbol, gridIndex, price, quantity, side, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "insert into trade.virtualOrder (id, symbol, gridIndex, price, quantity, side, status,updateTime) VALUES (?, ?, ?, ?, ?, ?, ?,?)";
         try {
             try (PreparedStatement statement = conn.prepareStatement(sql)) {
                 statement.setObject(1, gridOrder.getOrderId());
@@ -198,6 +198,7 @@ public class JdbcTest {
                 statement.setObject(5, gridOrder.getQuantity());
                 statement.setObject(6, gridOrder.getSide());
                 statement.setObject(7, gridOrder.getOrderState().getState());
+                statement.setObject(8, gridOrder.getUpdateTime());
                 statement.execute();
             }
         } catch (Exception e) {
