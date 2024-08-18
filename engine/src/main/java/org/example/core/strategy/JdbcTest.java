@@ -106,7 +106,8 @@ public class JdbcTest {
                         double avgPrice = resultSet.getDouble("avgPrice");
                         double executedQuantity = resultSet.getDouble("executedQuantity");
                         int orderSide = resultSet.getInt("side");
-                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.NEW, orderSide);
+                        long updateTime = resultSet.getLong("updateTime");
+                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.NEW, orderSide,updateTime);
                         gridOrderVos.add(gridOrderVo);
                     }
                     return gridOrderVos;
@@ -147,7 +148,8 @@ public class JdbcTest {
                         double executedQuantity = resultSet.getDouble("executedQuantity");
                         int orderSide = resultSet.getInt("side");
                         int status = resultSet.getInt("status");
-                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.orderState(status), orderSide);
+                        long updateTime = resultSet.getLong("updateTime");
+                        GridOrder gridOrderVo = new GridOrder(id, symbol, gridIndex, avgPrice, executedQuantity, OrderState.orderState(status), orderSide,updateTime);
                         gridOrderVos.add(gridOrderVo);
                     }
                     return gridOrderVos;

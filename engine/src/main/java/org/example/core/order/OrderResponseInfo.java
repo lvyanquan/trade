@@ -36,7 +36,9 @@ public class OrderResponseInfo {
     //BUY SELL
     private String side;
 
-    public OrderResponseInfo(String clientOrderId, String orderId, String symbol, String status, double cummulativeQuoteQty, double executedQty, double origQty, double price,String side) {
+    private long updateTime;
+
+    public OrderResponseInfo(String clientOrderId, String orderId, String symbol, String status, double cummulativeQuoteQty, double executedQty, double origQty, double price,String side,long updateTime) {
         this.clientOrderId = clientOrderId;
         this.orderId = orderId;
         this.symbol = symbol;
@@ -46,6 +48,7 @@ public class OrderResponseInfo {
         this.origQty = origQty;
         this.price = price;
         this.side = side;
+        this.updateTime = updateTime;
     }
 
 
@@ -83,5 +86,9 @@ public class OrderResponseInfo {
 
     public String getSide() {
         return side;
+    }
+
+    public long getUpdateTime() {
+        return updateTime;
     }
 }

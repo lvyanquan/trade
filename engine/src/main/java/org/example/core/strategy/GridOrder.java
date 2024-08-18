@@ -18,42 +18,35 @@
 
 package org.example.core.strategy;
 
+import org.example.core.enums.OrderState;
+
 public class GridOrder {
-    private double feeRate = 0.00075;
-    //触发价格买入
-    private double price;
-    private double amount;
-    private double lowPrice;
+    //    private double feeRate = 0.00075;
     //这是第几个单子
     private int sequnce;
-    //下单成交后的数量
-    private double quantity;
-    //理论每个单子的成交额
+    //触发价格买入
+    private double triggerBuyPrice;
 
-    //0挂单 1 成交
+    //买入成交价格
+    private double orderBuyPrice;
+    //卖出价
+    private double triggerSellPrice;
+
+    //需要卖出的数量
+    private double quantity;
+
+    //0canBug  1交易中 2canSell
     private int status;
 
-    public GridOrder(int sequnce, double feeRate,double amount) {
-        this.sequnce = sequnce;
-        this.feeRate = feeRate;
-        this.amount = amount;
-    }
+    private long lastBuyUpdateTime;
+
 
     public GridOrder(int sequnce) {
         this.sequnce = sequnce;
     }
 
-    public void setPrice(double price) {
-        this.price = price;
-    }
-
-    public void setPriceAndCalcuteLowPrice(double price) {
-        if(canSell() && price < this.price){
-            this.price = price;
-            return;
-        }
-        this.price = price;
-        this.lowPrice = calculateBreakEvenSellPrice(amount);
+    public void updateTriggerPrice(double price) {
+        this.triggerBuyPrice = price;
     }
 
     //下单了 就直接更新
@@ -61,65 +54,62 @@ public class GridOrder {
         this.quantity = quantity;
     }
 
-    //回调，对这个订单进行更新
-    public void setStatus(int status) {
-        this.status = status;
+    public double getOrderBuyPrice() {
+        return orderBuyPrice;
     }
 
-    public double getPrice() {
-        return price;
+    public double getTriggerBuyPrice() {
+        return triggerBuyPrice;
     }
 
     public double getQuantity() {
         return quantity;
     }
 
-    //如果可以卖出的话，价格就是 price + atr计算出来的
-    public boolean canSell() {
-        return quantity > 0 && status == 1;
+
+
+    public void updateCanSell(double quantity,double orderBuyPrice,double sellPrice,long buyTime) {
+        this.status = 2;
+        this.quantity = quantity;
+        this.orderBuyPrice = orderBuyPrice;
+        this.triggerSellPrice = sellPrice;
+        this.lastBuyUpdateTime = buyTime;
     }
 
+    public void updateCanBuy() {
+        this.status = 0;
+        this.quantity = 0;
+    }
+
+    public void updateTradIng() {
+        this.status = 1;
+    }
+
+    public boolean canSell() {
+        return status == 2;
+    }
+
+
     public boolean canBuy() {
-        return quantity <= 0;
+        return status == 0;
     }
 
     public int getSequnce() {
         return sequnce;
     }
 
-    public double getLowPrice() {
-        return lowPrice;
+    public double getTriggerSellPrice() {
+        return triggerSellPrice;
     }
 
-    /**
-     * 计算不亏本的最低卖出价
-     *
-     * @param totalBuyAmount 买入金额，不含手续费
-     * @return 最低卖出价
-     */
-    public double calculateBreakEvenSellPrice(double totalBuyAmount) {
-        // 计算买入数量：总买入金额 / 每单位买入价
-        double quantity = totalBuyAmount / price;
-
-        // 计算买入时的实际成本（包括手续费）
-        double totalBuyCost = totalBuyAmount * (1 + feeRate);
-
-        // 目标利润，等于买入成本的手续费
-        double targetProfit = totalBuyCost * feeRate * 4;
-
-        // 目标收入，既要覆盖成本，又要包含目标利润
-        double targetRevenue = totalBuyCost + targetProfit;
-
-        // 计算不亏本且利润为手续费相同的最低卖出价
-        double sellPrice = targetRevenue / (quantity * (1 - feeRate));
-
-        return sellPrice;
+    public void setTriggerSellPrice(double triggerSellPrice) {
+        this.triggerSellPrice = triggerSellPrice;
     }
 
     @Override
     public String toString() {
         return "GridOrder{" +
-                "price=" + price +
+                "price=" + triggerBuyPrice +
                 ", sequnce=" + sequnce +
                 ", quantity=" + quantity +
                 ", status=" + status +

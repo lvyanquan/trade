@@ -16,30 +16,16 @@
  * limitations under the License.
  */
 
-package org.example.core.bar;
+package org.example.core;
 
-import com.binance.connector.client.impl.SpotClientImpl;
-import com.binance.connector.client.impl.spot.Trade;
-import org.example.core.Constant;
-import org.example.core.order.analyze.BinanceGridTradingStats;
-import org.example.core.strategy.JdbcTest;
-import org.junit.Test;
+public class TradeContext {
+    private AccountModel accountModel;
 
-public class TradeRecordTest {
-    Trade trade = new SpotClientImpl(Constant.API_KEY, Constant.SECRET_KEY).createTrade();
-
-    @Test
-    public void profile() throws Exception {
-        BinanceGridTradingStats binanceGridTradingStats = new BinanceGridTradingStats(trade);
-        binanceGridTradingStats.calculateStats();
+    public TradeContext(AccountModel accountModel) {
+        this.accountModel = accountModel;
     }
 
-
-    @Test
-    public void selectOrder() throws Exception {
-        System.out.println(JdbcTest.selectNotTradeOrders());
-        System.out.println(JdbcTest.selectTradeOrders().size());
+    public AccountModel getAccountModel() {
+        return accountModel;
     }
-
-
 }

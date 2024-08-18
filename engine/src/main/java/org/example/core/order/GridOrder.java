@@ -40,7 +40,9 @@ public class GridOrder {
 
     private int side;
 
-    public GridOrder(String orderId, String symbol, int gridIndex, double avgPrice, double executedQuantity, OrderState orderState, int side) {
+    private long updateTime;
+
+    public GridOrder(String orderId, String symbol, int gridIndex, double avgPrice, double executedQuantity, OrderState orderState, int side,long time) {
         this.orderId = orderId;
         this.symbol = symbol;
         this.gridIndex = gridIndex;
@@ -48,9 +50,10 @@ public class GridOrder {
         this.executedQuantity = executedQuantity;
         this.orderState = orderState;
         this.side = side;
+        this.updateTime = time;
     }
 
-    public GridOrder(String orderId, String symbol, int gridIndex, double price, double quantity, int side) {
+    public GridOrder(String orderId, String symbol, int gridIndex, double price, double quantity, int side,long time) {
         this.orderId = orderId;
         this.symbol = symbol;
         this.gridIndex = gridIndex;
@@ -58,6 +61,7 @@ public class GridOrder {
         this.quantity = quantity;
         this.orderState = OrderState.NEW;
         this.side = side;
+        this.updateTime = time;
     }
 
     public String getOrderId() {
@@ -94,5 +98,9 @@ public class GridOrder {
 
     public double getQuantity() {
         return quantity;
+    }
+
+    public long getUpdateTime() {
+        return updateTime;
     }
 }

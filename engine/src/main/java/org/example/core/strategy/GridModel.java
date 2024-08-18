@@ -18,13 +18,17 @@
 
 package org.example.core.strategy;
 
+import org.example.core.AccountModel;
 import org.example.core.Constant;
+import org.example.core.TradeContext;
+import org.example.core.TradeContextAble;
 import org.example.core.bar.*;
 import org.example.core.bar.util.BarConvent;
 import org.example.core.order.GridOrder;
 import org.example.core.order.GridOrderManager;
 import org.example.core.enums.OrderState;
 import org.example.core.order.TradeUtil;
+import org.example.core.strategy.grid.GridOrderBook;
 import org.example.core.util.DateUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +43,6 @@ import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -48,7 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 //2748 初始仓位
-public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
+public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeContextAble {
     private static final Logger LOG = LoggerFactory.getLogger(GridModel.class);
 
 
@@ -78,17 +81,13 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
     //总金额上限
     protected double gridAmount;
 
-    //====triggerBuyTradePrice 和 triggerSellTradePrice 触发之后。不是一定要卖，需要找到对应的订单是否能卖出和买入，并且更新价格
-    //触发买入的价格
-    protected org.example.core.strategy.GridOrder nextBuyGridOrder;
-    //触发卖出的价格
-    protected org.example.core.strategy.GridOrder nextSellGridOrder;
-
     protected LocalDateTime updateTime;
 
     protected ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
-    ArrayList<org.example.core.strategy.GridOrder> gridGridOrders = new ArrayList<>(gridNumber);
+    private GridOrderBook gridOrderBook;
+    private TradeContext context;
+
     private GridOrderManager gridOrderManager;
 
     boolean windowDataApply = false;
@@ -115,6 +114,8 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
         );
 
         GridModel gridModel = new GridModel("grid-01", 30, 60, btcSymbol);
+        TradeContext tradeContext = new TradeContext(new AccountModel(0.00075, 1800));
+        gridModel.initTradeContext(tradeContext);
 
         new BarEngineBuilder<BaseBarExtend>()
                 .exchange(exchange)
@@ -137,11 +138,6 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
         this.gridNumber = gridNumber;
         this.gridAmount = gridAmount;
         this.symbol = symbol;
-        if (Constant.API_KEY != null) {
-            this.gridOrderManager = new GridOrderManager(Constant.API_KEY, Constant.SECRET_KEY);
-        } else {
-            //mockOrderManager
-        }
     }
 
     @Override
@@ -174,7 +170,6 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                     .build();
             historySOurce.run();
             historySOurce.close();
-
             GridVo gridVo = JdbcTest.selectGridVo(name);
             if (gridVo != null) {
                 //必须是当天的才能更新，否则认为就过时了
@@ -201,56 +196,15 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                     new Timestamp(System.currentTimeMillis()));
             JdbcTest.insertAndDeleteBeforeGridVo(newGridVo);
             LOG.info("start grid... " + newGridVo);
-            //丁单薄的更新 最后加上下单操作即可上线了
-            List<org.example.core.order.GridOrder> gridOrders = gridOrderManager.selectAllWorkerOrder();
-            HashMap<Integer, org.example.core.order.GridOrder> orderMap = new HashMap<>();
-            for (GridOrder gridOrder : gridOrders) {
-                orderMap.put(gridOrder.getGridIndex(), gridOrder);
-            }
+            this.gridOrderBook = new GridOrderBook(context.getAccountModel(), gridNumber, 0.6, centralPrice, atrPrice);
+
             //是否有持仓的单子即可
-            this.hasTrade = !gridOrders.isEmpty();
-
-            //centralPrice下方有几个网格点
-            int downGridNumber = Double.valueOf(gridNumber * 0.6D).intValue();
-            for (int i = 0; i < gridNumber; i++) {
-                org.example.core.strategy.GridOrder gridOrder = new org.example.core.strategy.GridOrder(i, 0.00075, gridAmount);
-                //每个订单设置买入价格
-                //卖出价格 为买入价格 + atr *1.1 计算得出
-                gridOrder.setPriceAndCalcuteLowPrice(centralPrice - (downGridNumber - i) * (atrPrice) - ((downGridNumber- i) * 0.1 < 5 ? downGridNumber * 0.1 : 5) * atrPrice);
-                gridGridOrders.add(gridOrder);
-
-                if (orderMap.get(i) != null) {
-                    org.example.core.order.GridOrder order = orderMap.get(i);
-                    if (order.getOrderState() == OrderState.FILLED || order.getOrderState() == OrderState.PARTIALLY_FILLED) {
-                        gridOrder.setQuantity(order.getExecutedQuantity());
-                        gridOrder.setStatus(1);
-                        gridOrder.setPriceAndCalcuteLowPrice(order.getAvgPrice());
-                    } else if (order.getOrderState() == OrderState.NEW) {
-                        gridOrder.setQuantity(order.getQuantity());
-                        gridOrder.setStatus(0);
-                    }
-                }
-            }
+            this.hasTrade = !gridOrderBook.hasTrade();
 
             gridOrderManager.registerListener(order -> {
-                org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(order.getGridIndex());
-                if (order.getOrderState() == OrderState.FILLED || order.getOrderState() == OrderState.PARTIALLY_FILLED) {
-                    //买单成交，代表这个网格点可以卖出了
-                    if (order.getSide() == 0) {
-                        gridOrder.setQuantity(order.getExecutedQuantity());
-                        gridOrder.setStatus(1);
-                    } else if (order.getSide() == 2) {
-                        //如果卖单成交，代表这个网格点可以买入了
-                        gridOrder.setQuantity(0);
-                        gridOrder.setStatus(0);
-                    }
-                } else if (order.getOrderState().isInvalid()) {
-                    gridOrder.setQuantity(0);
-                    gridOrder.setStatus(0);
-                }
+                gridOrderBook.update(order);
                 updateTriggerOrder();
             });
-
 
             //周期线程创建，进行更新操作逻辑
             //每个4小时更新一次 atr，就会更新一次丁单薄 对 gridOrders 进行一次循环，把买入价格更新下
@@ -262,30 +216,10 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                         if (Duration.between(updateTime, now).compareTo(Duration.ofHours(6)) >= 0) {
                             state.set(1);
                             this.centralPrice = emaIndicatorLong.getValue(barSeries.getEndIndex()).doubleValue();
-                            this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
-                            if (this.atrPrice < minAtrPrice) {
-                                this.atrPrice = minAtrPrice;
-                            }
-                            this.updateTime = LocalDateTime.now();
-
-                            JdbcTest.insertAndDeleteBeforeGridVo(new GridVo(name,
-                                    gridNumber,
-                                    centralPrice,
-                                    gridAmount,
-                                    new Timestamp(System.currentTimeMillis())));
-                            updateOrdersPrice();
-                            updateTriggerOrder();
+                            update();
                             state.set(2);
                         } else if (Duration.between(updateTime, now).compareTo(Duration.ofHours(4)) >= 0) {
-                            state.set(1);
-                            this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
-                            if (this.atrPrice < minAtrPrice) {
-                                this.atrPrice = minAtrPrice;
-                            }
-                            this.updateTime = LocalDateTime.now();
-                            updateOrdersPrice();
-                            updateTriggerOrder();
-                            state.set(2);
+                            update();
                         }
                     },
                     0,
@@ -293,8 +227,6 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                     TimeUnit.HOURS);
 
             state.set(2);
-        } else {
-            //打印日志？
         }
     }
 
@@ -319,70 +251,80 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
         if (System.currentTimeMillis() - DateUtil.convent(bar.getCreateTime()) > 3000) {
             return;
         }
-        //triggerBuyTradePrice 和 triggerSellTradePrice 进行更新;
-        if (nextBuyGridOrder == null || nextSellGridOrder == null) {
-            updateTriggerOrder();
-        }
         if (state.get() != 2) {
             LOG.info("更新中，暂时不交易");
             return;
         }
+        //triggerBuyTradePrice 和 triggerSellTradePrice 进行更新;
+        if (gridOrderBook.getNextBuyGridOrder() == null || gridOrderBook.getNextSellGridOrder() == null) {
+            updateTriggerOrder();
+        }
 
-        if (bar.getClosePrice().doubleValue() < nextBuyGridOrder.getPrice()) {
-            if (nextBuyGridOrder.canBuy()) {
-                //触发交易，查找最近的一个网格，买入
-                if (!hasTrade) {
-                    //第一次买入多单，构建多个单子即可
-                    for (int i = nextBuyGridOrder.getSequnce(); i < nextBuyGridOrder.getSequnce() + firstTradeAmount && i < gridGridOrders.size(); i++) {
-                        boolean buy = buyOrder(i, bar.getClosePrice().doubleValue(), true);
-                        if (buy) {
-                            hasTrade = true;
-                        }
+        if (forzenBuyTime > 0 && System.currentTimeMillis() - forzenBuyTime > 2 * 60 * 60 * 1000) {
+            forzenBuyTime = 0;
+            buyContinues--;
+            buyContinues--;
+        }
+
+        double closePrice = bar.getClosePrice().doubleValue();
+        if (forzenBuyTime <= 0 || System.currentTimeMillis() - forzenBuyTime > 2 * 60 * 60 * 1000) {
+            if (!hasTrade && closePrice < firstTradePrice) {
+                //第一次买入多单，构建多个单子即可
+                for (int i = 0; i < firstTradeAmount; i++) {
+                    org.example.core.strategy.GridOrder upCanBuyOrderByPrice = gridOrderBook.getUpCanBuyOrderByPrice(closePrice);
+                    if (upCanBuyOrderByPrice == null) {
+                        break;
                     }
-                    buyContinues++;
-                    sellContinues = 0;
+                    boolean buy = buyOrder(upCanBuyOrderByPrice.getSequnce(), closePrice);
+                    if (buy) {
+                        hasTrade = true;
+                        buyContinues++;
+                        sellContinues = 0;
+                    }
+                }
+            } else if (hasTrade && closePrice < gridOrderBook.getNextBuyGridOrder().getTriggerBuyPrice()) {
+                org.example.core.strategy.GridOrder nextBuyGridOrder = gridOrderBook.getNextBuyGridOrder();
+                //触发交易，查找最近的一个网格，买入
+                //这部分就不进行状态恢复了 后续再完善吧
+                //如果这段时间净买入单子数量的20%，就设置冷近期2小时 或者 triggerBuyTradePrice - 2.2*atr，满足就继续买入
+                if (buyContinues < gridNumber * 0.1) {
+                    buyOrder(nextBuyGridOrder.getSequnce(), closePrice);
                 } else {
-                    //这部分就不进行状态恢复了 后续再完善吧
-                    //如果这段时间净买入单子数量的20%，就设置冷近期2小时 或者 triggerBuyTradePrice - 2.2*atr，满足就继续买入
-                    if (buyContinues < gridNumber * 0.2) {
-                        buyOrder(nextBuyGridOrder.getSequnce(), bar.getClosePrice().doubleValue(), false);
-
-                    } else {
-                        LOG.info(String.format("连续交易次数为 %s,暂停交易", buyContinues));
-                        if (forzenBuyTime <= 0) {
-                            forzenBuyTime = System.currentTimeMillis();
-                        } else {
-                            if (System.currentTimeMillis() - forzenBuyTime > 2 * 60 * 60 * 1000) {
-                                forzenBuyTime = 0;
-                                buyContinues--;
-                            }
-                        }
+                    LOG.info(String.format("连续交易次数为 %s,暂停交易", buyContinues));
+                    if (forzenBuyTime <= 0) {
+                        forzenBuyTime = System.currentTimeMillis();
                     }
                 }
                 updateTriggerOrder();
             }
+
         }
 
 
-        if (nextSellGridOrder.canSell()
-                && bar.getClosePrice().doubleValue() > nextSellGridOrder.getPrice() + (atrPrice * 3)
-                && bar.getClosePrice().doubleValue() > nextSellGridOrder.getLowPrice()) {
-
+        if (closePrice > gridOrderBook.getNextSellGridOrder().getTriggerSellPrice()
+                && closePrice > gridOrderBook.getNextSellGridOrder().getOrderBuyPrice()) {
+            org.example.core.strategy.GridOrder nextSellGridOrder = gridOrderBook.getNextSellGridOrder();
+            if(!nextSellGridOrder.canSell()){
+                return;
+            }
+            nextSellGridOrder.updateTradIng();
             //1 卖出操作
             //2 更新订单薄
             //如果这段时间连续卖出2单子，就设置触发价格为 3atr，满足就卖出
-            double sellPrice = Math.max(nextSellGridOrder.getLowPrice(), nextSellGridOrder.getPrice() + (atrPrice * 1.5));
-            sellPrice = Math.max(bar.getClosePrice().doubleValue(), sellPrice);
+            double sellPrice =Math.max( gridOrderBook.getNextSellGridOrder().getTriggerSellPrice(),gridOrderBook.getNextSellGridOrder().getOrderBuyPrice());
             if (sellContinues >= 2) {
                 sellPrice = sellPrice + atrPrice;
             }
-            nextSellGridOrder.setStatus(0);
+
+            sellPrice = sellPrice + 10;
+            double quantity = BigDecimal.valueOf(nextSellGridOrder.getQuantity()).setScale(5, RoundingMode.DOWN).doubleValue();
+
             String clientId = name + "_" + nextSellGridOrder.getSequnce() + "_" + System.currentTimeMillis();
             Exception e2 = null;
             try {
                 TradeUtil.orderLimitPingDuo(symbol.getSymbol(),
-                        sellPrice + 10,
-                        nextSellGridOrder.getQuantity(),
+                        sellPrice ,
+                        quantity,
                         2,
                         clientId,
                         gridOrderManager.getTradeClient());
@@ -395,7 +337,8 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
                         nextSellGridOrder.getSequnce(),
                         sellPrice,
                         nextSellGridOrder.getQuantity(),
-                        2));
+                        2,
+                        System.currentTimeMillis()));
                 sellContinues++;
                 buyContinues = 0;
             }
@@ -405,92 +348,48 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
     }
 
 
-    //todo  如果atr 和 centralPrice变更进行订单更新，此时已经下单持有的单子 卖出价格不应该更新
     public void updateOrdersPrice() {
-        int downGridNumber = Double.valueOf(gridNumber * 0.6D).intValue();
-        for (int i = 0; i < gridNumber; i++) {
-            gridGridOrders.get(i).setPriceAndCalcuteLowPrice(centralPrice - (downGridNumber - i) * (atrPrice * 2) - (downGridNumber * 0.1 < 5 ? downGridNumber * 0.1 : 5) * atrPrice);
-
-        }
+        gridOrderBook.updateOrdersByCentralPrice(centralPrice,atrPrice);
     }
 
     public void updateTriggerOrder() {
-        double closePrice = closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue();
-        updateBuyOrder(closePrice);
-        updateSellOrder();
-
+        gridOrderBook.updateTriggerOrder(closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue());
         print();
     }
 
 
-    public void updateBuyOrder(double closePrice) {
-        org.example.core.strategy.GridOrder tempnextBuyGridOrder = null;
-        for (int i = gridNumber - 1; i >= 0; i--) {
-            org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
-            if (gridOrder.canBuy() && gridOrder.getPrice() < closePrice) {
-                tempnextBuyGridOrder = gridGridOrders.get(i);
-                break;
-            }
-        }
-        //当前价格下方没有一个可以买入的网格点，所以价格置为-1，永远不会触发买入
-        //只有等到有卖出了，即价格回到网格范围内，才会重新更新 或者centerPrice变更，价格回到网格范围内
-        if (tempnextBuyGridOrder == null) {
-            nextBuyGridOrder = new org.example.core.strategy.GridOrder(-1);
-            nextBuyGridOrder.setPrice(-1);
-        } else {
-            nextBuyGridOrder = tempnextBuyGridOrder;
-        }
-    }
+    public boolean buyOrder(int sequence, double closePrice) {
 
-    //找到买入价格最低的一次成交记录，作为卖出价格触发
-    //如果没有的话 就是当前价格最近的上方单子,有可能这个单子没持有。没货卖
-    public void updateSellOrder() {
-        org.example.core.strategy.GridOrder tempnextSellGridOrder = null;
-        for (int i = 0; i < gridNumber; i++) {
-            org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
-            if (gridOrder.canSell()) {
-                if (tempnextSellGridOrder == null) {
-                    tempnextSellGridOrder = gridGridOrders.get(i);
-                } else {
-                    tempnextSellGridOrder = tempnextSellGridOrder.getPrice() < gridOrder.getPrice() ? tempnextSellGridOrder : gridOrder;
-                }
-            }
+        org.example.core.strategy.GridOrder gridOrder = gridOrderBook.getOrder(sequence);
+        if (!gridOrder.canBuy()) {
+            return false;
         }
-        //当前价格下方没有一个可以买入的网格点，所以价格置为-1，永远不会触发买入
-        //只有等到有卖出了，即价格回到网格范围内，才会重新更新 或者centerPrice变更，价格回到网格范围内
-        if (tempnextSellGridOrder == null) {
-            nextSellGridOrder = new org.example.core.strategy.GridOrder(-1);
-            nextSellGridOrder.setPrice(10000000000d);
-        } else {
-            nextSellGridOrder = tempnextSellGridOrder;
-        }
-    }
+        gridOrder.updateTradIng();
 
-    public boolean buyOrder(int sequence, double closePrice, boolean firstBuy) {
-        org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(sequence);
-        gridOrder.setStatus(0);
-        gridOrder.setQuantity(BigDecimal.valueOf(gridAmount / (firstBuy ? firstTradePrice : gridOrder.getPrice())).setScale(5, RoundingMode.DOWN).doubleValue());
+        double tradePrice = closePrice - 10;
+        gridOrder.setQuantity(BigDecimal.valueOf(gridAmount / tradePrice).setScale(5, RoundingMode.DOWN).doubleValue());
         String clientId = name + "_" + sequence + "_" + System.currentTimeMillis();
         Exception e2 = null;
         try {
             TradeUtil.orderLimitDuo(symbol.getSymbol(),
-                    (firstBuy ? firstTradePrice : closePrice) - 10,
+                    tradePrice,
                     gridAmount,
                     2,
                     5,
                     clientId,
                     gridOrderManager.getTradeClient());
         } catch (Exception e) {
-            gridOrder.setQuantity(0);
+            gridOrder.updateCanBuy();
             e2 = e;
         }
         if (e2 == null) {
             gridOrderManager.insertNewOrder(new GridOrder(clientId,
                     symbol.getSymbol(),
                     gridOrder.getSequnce(),
-                    gridOrder.getPrice(),
+                    gridOrder.getTriggerBuyPrice(),
                     gridOrder.getQuantity(),
-                    0));
+                    0,
+                    System.currentTimeMillis()));
 
             if (buyContinues > 2) {
                 buyContinues--;
@@ -506,9 +405,42 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend> {
     }
 
     private void print() {
-        if (nextBuyGridOrder != null && nextSellGridOrder != null) {
-            String format = String.format("当前价格： %s, 当前触发买入价 ： %s, 当前触发卖出价 ： %s, centerPrice: %s, atr : %s, 当前网格最低点: %s,当前网格最高点: %s", closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue(), hasTrade ? nextBuyGridOrder.getPrice() : firstTradePrice, nextSellGridOrder.getLowPrice(), centralPrice, atrPrice, gridGridOrders.get(0).getPrice(), gridGridOrders.get(gridNumber - 1).getPrice());
-            LOG.info(format);
+        GridOrderBook.GridOrderBookMetric metric = gridOrderBook.getMetric();
+        String format = String.format("当前价格： %s, 当前触发买入价 ： %s, 当前触发卖出价 ： %s, centerPrice: %s, atr : %s, 当前网格最低点: %s,当前网格最高点: %s",
+                closePriceIndicator.getValue(barSeries.getEndIndex()).doubleValue(),
+                hasTrade ? metric.getTriggerBuyPrice() : firstTradePrice,
+                metric.getTriggerSellPrice(),
+                metric.getCentralPrice(),
+                metric.getAtrPrice(),
+                metric.getLowBuyPrice(),
+                metric.getHighBuyPrice());
+        LOG.info(format);
+
+    }
+
+    private void update(){
+        this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
+        if (this.atrPrice < minAtrPrice) {
+            this.atrPrice = minAtrPrice;
         }
+        LocalDateTime now = LocalDateTime.now();
+        JdbcTest.insertAndDeleteBeforeGridVo(new GridVo(name,
+                gridNumber,
+                centralPrice,
+                gridAmount,
+                new Timestamp( DateUtil.convent(now))));
+        updateOrdersPrice();
+        updateTriggerOrder();
+        this.updateTime = now;
+    }
+
+    @Override
+    public TradeContext getTradeContext() {
+        return context;
+    }
+
+    @Override
+    public void initTradeContext(TradeContext context) {
+        this.context = context;
     }
 }

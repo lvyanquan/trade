@@ -16,10 +16,13 @@
  * limitations under the License.
  */
 
-package org.example.core.order;
+package org.example.core.order.analyze;
 
 import com.binance.connector.client.impl.spot.Trade;
 import org.example.core.enums.OrderState;
+import org.example.core.order.BinanceTradeJsonParse;
+import org.example.core.order.OrderResponseInfo;
+import org.example.core.order.TradeRecord;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;

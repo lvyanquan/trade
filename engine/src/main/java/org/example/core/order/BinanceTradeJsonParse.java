@@ -57,6 +57,7 @@ public class BinanceTradeJsonParse {
         String orderId = orderMap.get("orderId").toString();
         String crrency = orderMap.get("symbol").toString();
         String status = orderMap.get("status").toString();
+        long updateTime = Long.parseLong(orderMap.get("updateTime").toString());
 
         // 累计交易的金额 实际金额
         double cummulativeQuoteQty = Double.parseDouble(orderMap.get("cummulativeQuoteQty").toString());
@@ -68,7 +69,7 @@ public class BinanceTradeJsonParse {
         String side = orderMap.get("side").toString();
 
 
-        return new OrderResponseInfo(id, orderId, crrency, status, cummulativeQuoteQty, executedQty, origQty, price, side);
+        return new OrderResponseInfo(id, orderId, crrency, status, cummulativeQuoteQty, executedQty, origQty, price, side,updateTime);
 
     }
 
