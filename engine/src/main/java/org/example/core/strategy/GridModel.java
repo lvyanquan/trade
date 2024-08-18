@@ -255,7 +255,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
         if (gridOrderBook.getNextBuyGridOrder() == null || gridOrderBook.getNextSellGridOrder() == null) {
             updateTriggerOrder();
         }
-        updateTriggerOrder();
+
 
         if (forzenBuyTime > 0 && System.currentTimeMillis() - forzenBuyTime > 2 * 60 * 60 * 1000) {
             forzenBuyTime = 0;
