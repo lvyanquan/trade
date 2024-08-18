@@ -71,6 +71,27 @@ public class GridOrderBook {
             gridOrder.updateTriggerPrice(buyProce);
             gridGridOrders.add(gridOrder);
         }
+        //取买入单，价格最小的index，如果下方的index还有,那么判断两者之间差值，必须是在1个atr之外，如果较小，需要对下方的价格再减去这个差值
+        gridGridOrders.stream().filter(GridOrder::canSell)
+                .min((a, b) -> a.getOrderBuyPrice() == b.getTriggerBuyPrice() ? 0 : a.getOrderBuyPrice() - b.getTriggerBuyPrice() > 0 ? 1 : -1).ifPresent(i -> {
+            int sequnce = i.getSequnce();
+            if (sequnce > 0) {
+                GridOrder gridOrder = gridGridOrders.get(sequnce - 1);
+                double minPrice =  0;
+                if (i.getOrderBuyPrice() - gridOrder.getTriggerBuyPrice() < 0.6 * atrPrice) {
+                    minPrice = 0.6 * atrPrice - (i.getOrderBuyPrice() - gridOrder.getTriggerBuyPrice());
+                }
+                if(minPrice > 0){
+                    //倒叙排序
+                    for(int index = 0;index <sequnce;index++){
+                        GridOrder gridOrder1 = gridGridOrders.get(index);
+                        if(gridOrder1.getSequnce() < i.getSequnce()){
+                            gridOrder1.updateTriggerPrice(gridOrder1.getTriggerBuyPrice() - minPrice);
+                        }
+                    }
+                }
+            }
+        });
     }
 
     public void revovery(GridOrderManager gridOrderManager) {
@@ -187,7 +208,7 @@ public class GridOrderBook {
                 centralPrice,
                 atrPrice,
                 gridGridOrders.get(0).getTriggerBuyPrice(),
-                gridGridOrders.get(gridGridOrders.size()-1).getTriggerBuyPrice());
+                gridGridOrders.get(gridGridOrders.size() - 1).getTriggerBuyPrice());
     }
 
 
@@ -216,7 +237,7 @@ public class GridOrderBook {
         }
     }
 
-    public void printOrder(){
+    public void printOrder() {
         LOG.info("网格订单信息: {} ", GsonUtil.GSON.toJson(gridGridOrders));
     }
 
