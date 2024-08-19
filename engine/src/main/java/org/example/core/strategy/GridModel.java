@@ -46,6 +46,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -82,7 +83,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     //每个网格交易的usdt仓位
     protected double gridAmount;
 
-    protected LocalDateTime updateTime =  LocalDateTime.now();
+    protected LocalDateTime updateTime = LocalDateTime.now();
 
     protected ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
@@ -101,6 +102,8 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     private int buyContinues = 0;
 
     private long forzenBuyTime = 0;
+
+    private long tradeBarIndex;
 
     public static void main(String[] args) throws Exception {
         String symbol = "BTCUSDT";
@@ -193,9 +196,9 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                             state.set(2);
                         }
                     },
+                    15,
                     1,
-                    1,
-                    TimeUnit.HOURS);
+                    TimeUnit.MINUTES);
             state.set(2);
         }
     }
@@ -315,7 +318,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
             //2 更新订单薄
             //如果这段时间连续卖出2单子，就设置触发价格为 3atr，满足就卖出
             double sellPrice = Math.max(gridOrderBook.getNextSellGridOrder().getTriggerSellPrice(), gridOrderBook.getNextSellGridOrder().getOrderBuyPrice());
-            sellPrice = Math.max(sellPrice,closePrice);
+            sellPrice = Math.max(sellPrice, closePrice);
             if (sellContinues >= 2) {
                 sellPrice = sellPrice + atrPrice;
             }
@@ -361,7 +364,8 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     public boolean buyOrder(int sequence, double closePrice) {
 
         org.example.core.strategy.grid.GridOrder gridOrder = gridOrderBook.getOrder(sequence);
-        if (!gridOrder.canBuy()) {
+        //交易过一次之后，至少等2根k线之后才能交易 防止插针一直交易
+        if (!gridOrder.canBuy() || barSeries.getEndIndex() - tradeBarIndex > 1) {
             return false;
         }
         gridOrder.updateTradIng();
@@ -397,6 +401,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
             } else {
                 buyContinues = 0;
             }
+            tradeBarIndex = barSeries.getEndIndex();
             sellContinues = 0;
             return true;
         }
@@ -422,6 +427,14 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
         this.atrPrice = atrIndicator.getValue(barSeries.getEndIndex()).doubleValue();
         if (this.atrPrice < minAtrPrice) {
             this.atrPrice = minAtrPrice;
+        }
+        //todo 择时 如果是 某某时间点，就需要增加
+        ZonedDateTime endTime = barSeries.getLastBar().getEndTime();
+        if (endTime.getHour() == 15 || endTime.getHour() == 22 || endTime.getHour() == 23) {
+            atrPrice = atrPrice * 1.5;
+        }
+        if (endTime.getHour() == 10 || endTime.getHour() == 11) {
+            atrPrice = atrPrice * 1.2;
         }
         LocalDateTime now = LocalDateTime.now();
         gridOrderBook.updateOrdersByCentralPrice(centralPrice, atrPrice);

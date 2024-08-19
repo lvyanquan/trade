@@ -55,7 +55,7 @@ public class TradeRecordTest {
     public void analyzeAllOrder() {
         // 从数据库加载数据，并创建 BaseOrder 和 Trade 实例列表
         //加上一个时间戳
-        long startTime = System.currentTimeMillis() - 5 * 24  * 60 * 60 * 1000;
+        long startTime = System.currentTimeMillis() - 1 * 24  * 60 * 60 * 1000;
         long endTime = System.currentTimeMillis();
 
         List<BaseOrder> orders = JdbcTest.findAllOrder("BTCUSDT", startTime, endTime);
