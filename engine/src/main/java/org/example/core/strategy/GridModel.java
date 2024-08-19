@@ -232,7 +232,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     public void applyWindow(BaseBarExtend bar) {
         barSeries.addBar(bar, true);
         windowDataApply = true;
-        if (System.currentTimeMillis() - DateUtil.convent(bar.getCreateTime()) > 3000) {
+        if (System.currentTimeMillis() - DateUtil.convent(bar.getEndTime()) > 30000) {
             return;
         }
         //todo 这个属于orderBook的内容吗
