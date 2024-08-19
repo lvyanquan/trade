@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example.core.strategy;
+package org.example.core.strategy.grid;
 
 import org.example.core.enums.OrderState;
 

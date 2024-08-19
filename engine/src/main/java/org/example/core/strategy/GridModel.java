@@ -44,7 +44,6 @@ import org.ta4j.core.num.DoubleNum;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.Executors;
@@ -71,7 +70,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
     //当前中心价格
     protected double centralPrice;
     protected double atrPrice;
-    private final double minAtrPrice = 150;
+    private final double minAtrPrice = 200;
 
     //是否交易过
     protected boolean hasTrade = false;
@@ -271,7 +270,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
             if (!hasTrade && closePrice < firstTradePrice) {
                 //第一次买入多单，构建多个单子即可
                 for (int i = 0; i < firstTradeAmount; i++) {
-                    org.example.core.strategy.GridOrder upCanBuyOrderByPrice = gridOrderBook.getUpCanBuyOrderByPrice(closePrice);
+                    org.example.core.strategy.grid.GridOrder upCanBuyOrderByPrice = gridOrderBook.getUpCanBuyOrderByPrice(closePrice);
                     if (upCanBuyOrderByPrice == null) {
                         break;
                     }
@@ -283,7 +282,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                     }
                 }
             } else if (hasTrade && closePrice < gridOrderBook.getNextBuyGridOrder().getTriggerBuyPrice()) {
-                org.example.core.strategy.GridOrder nextBuyGridOrder = gridOrderBook.getNextBuyGridOrder();
+                org.example.core.strategy.grid.GridOrder nextBuyGridOrder = gridOrderBook.getNextBuyGridOrder();
                 //触发交易，查找最近的一个网格，买入
                 //这部分就不进行状态恢复了 后续再完善吧
                 //如果这段时间净买入单子数量的20%，就设置冷近期2小时 或者 triggerBuyTradePrice - 2.2*atr，满足就继续买入
@@ -303,7 +302,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
 
         if (closePrice > gridOrderBook.getNextSellGridOrder().getTriggerSellPrice()
                 && closePrice > gridOrderBook.getNextSellGridOrder().getOrderBuyPrice()) {
-            org.example.core.strategy.GridOrder nextSellGridOrder = gridOrderBook.getNextSellGridOrder();
+            org.example.core.strategy.grid.GridOrder nextSellGridOrder = gridOrderBook.getNextSellGridOrder();
             if (!nextSellGridOrder.canSell()) {
                 return;
             }
@@ -357,7 +356,7 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
 
     public boolean buyOrder(int sequence, double closePrice) {
 
-        org.example.core.strategy.GridOrder gridOrder = gridOrderBook.getOrder(sequence);
+        org.example.core.strategy.grid.GridOrder gridOrder = gridOrderBook.getOrder(sequence);
         if (!gridOrder.canBuy()) {
             return false;
         }

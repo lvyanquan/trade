@@ -21,7 +21,6 @@ package org.example.core.strategy.grid;
 import org.example.core.AccountModel;
 import org.example.core.enums.OrderState;
 import org.example.core.order.GridOrderManager;
-import org.example.core.strategy.GridOrder;
 import org.example.core.util.GsonUtil;
 import org.example.core.util.ProceCalcuteUtil;
 import org.slf4j.Logger;
@@ -47,9 +46,9 @@ public class GridOrderBook {
 
     //====triggerBuyTradePrice 和 triggerSellTradePrice 触发之后。不是一定要卖，需要找到对应的订单是否能卖出和买入，并且更新价格
     //触发买入的价格
-    private org.example.core.strategy.GridOrder nextBuyGridOrder;
+    private GridOrder nextBuyGridOrder;
     //触发卖出的价格
-    private org.example.core.strategy.GridOrder nextSellGridOrder;
+    private GridOrder nextSellGridOrder;
 
 
     public GridOrderBook(AccountModel accountModel, int gridNumber, double gridRatio, double centralPrice, double atrPrice) {
@@ -64,10 +63,10 @@ public class GridOrderBook {
         this.atrPrice = atrPrice;
         int downGridNumber = Double.valueOf(gridNumber * gridRatio).intValue();
         for (int i = 0; i < gridNumber; i++) {
-            org.example.core.strategy.GridOrder gridOrder = new org.example.core.strategy.GridOrder(i);
+            GridOrder gridOrder = new GridOrder(i);
             double gridPriceByAtr = centralPrice - ((downGridNumber - i) * (atrPrice));
             //固定atr确定好买入价格之后，越往下，网格间距会越来越大，这样在暴跌时，买入的价格会越来越低，这样可以减少风险
-            double buyProce = gridPriceByAtr - ((downGridNumber - i) * 0.1 < 5 ? downGridNumber * 0.1 : 5) * atrPrice;
+            double buyProce = gridPriceByAtr - ((downGridNumber - i) * 0.2 < 10 ? downGridNumber * 0.2 : 10) * atrPrice;
             gridOrder.updateTriggerPrice(buyProce);
             gridGridOrders.add(gridOrder);
         }
@@ -118,7 +117,7 @@ public class GridOrderBook {
     }
 
     public void update(org.example.core.order.GridOrder order) {
-        org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(order.getGridIndex());
+        GridOrder gridOrder = gridGridOrders.get(order.getGridIndex());
 
         if (order.getOrderState() == OrderState.FILLED || order.getOrderState() == OrderState.PARTIALLY_FILLED || (order.getOrderState() == OrderState.CANCELED && order.getExecutedQuantity() > 0)) {
             //买单成交，代表这个网格点可以卖出了
@@ -141,9 +140,9 @@ public class GridOrderBook {
     }
 
     public void updateBuyOrder(double closePrice) {
-        org.example.core.strategy.GridOrder tempnextBuyGridOrder = null;
+        GridOrder tempnextBuyGridOrder = null;
         for (int i = gridNumber - 1; i >= 0; i--) {
-            org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
+            GridOrder gridOrder = gridGridOrders.get(i);
             if (gridOrder.canBuy() && gridOrder.getTriggerBuyPrice() < closePrice) {
                 tempnextBuyGridOrder = gridGridOrders.get(i);
                 break;
@@ -152,7 +151,7 @@ public class GridOrderBook {
         //当前价格下方没有一个可以买入的网格点，所以价格置为-1，永远不会触发买入
         //只有等到有卖出了，即价格回到网格范围内，才会重新更新 或者centerPrice变更，价格回到网格范围内
         if (tempnextBuyGridOrder == null) {
-            nextBuyGridOrder = new org.example.core.strategy.GridOrder(-1);
+            nextBuyGridOrder = new GridOrder(-1);
             nextBuyGridOrder.updateTriggerPrice(-1);
         } else {
             nextBuyGridOrder = tempnextBuyGridOrder;
@@ -180,7 +179,7 @@ public class GridOrderBook {
 
     public GridOrder getUpCanBuyOrderByPrice(double closePrice) {
         for (int i = 0; i < gridNumber; i++) {
-            org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
+            GridOrder gridOrder = gridGridOrders.get(i);
             if (gridOrder.canBuy() && gridOrder.getTriggerBuyPrice() > closePrice) {
                 return gridOrder;
             }
@@ -206,7 +205,7 @@ public class GridOrderBook {
         //卖出价格 为买入价格 + atr *1.1 计算得出
         int downGridNumber = Double.valueOf(gridNumber * gridRatio).intValue();
         if (downGridNumber - gridOrder.getSequnce() > 0) {
-            double multity = (downGridNumber - gridOrder.getSequnce()) * 0.08 < 5 ? (downGridNumber - gridOrder.getSequnce()) * 0.08 : 5;
+            double multity = (downGridNumber - gridOrder.getSequnce()) * 0.8 < 10 ? (downGridNumber - gridOrder.getSequnce()) * 0.8 : 10;
             return buyPrice + atrPrice + multity * atrPrice;
         } else {
             return buyPrice + (atrPrice * 1.1);
@@ -216,7 +215,7 @@ public class GridOrderBook {
     // 如果超过12小时没有卖出，就尝试最小价格卖出
     public void updateSellOrderPrice() {
         for (int i = 0; i < gridNumber; i++) {
-            org.example.core.strategy.GridOrder gridOrder = gridGridOrders.get(i);
+            GridOrder gridOrder = gridGridOrders.get(i);
             if (gridOrder.canSell() && System.currentTimeMillis() - gridOrder.getLastBuyUpdateTime() > 12 * 60 * 60 * 1000) {
                 double sellPrice = ProceCalcuteUtil.calculateBreakEvenSellPrice(accountModel.getFeeRate(), gridOrder.getQuantity(), gridOrder.getQuantity() * gridOrder.getOrderBuyPrice(), 4);
                 if (sellPrice < gridOrder.getOrderBuyPrice()) {
