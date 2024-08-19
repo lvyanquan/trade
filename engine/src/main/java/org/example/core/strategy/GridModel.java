@@ -113,11 +113,15 @@ public class GridModel implements BarPipeline.BarHandler<BaseBarExtend>, TradeCo
                 -1
         );
 
+        //网格数量
         int gridNumber = 30;
+        //每个网格仓位60u
         double gridAmount = 60;
 
-        GridModel gridModel = new GridModel("grid-01", 30, 60, btcSymbol);
-        TradeContext tradeContext = new TradeContext(new AccountModel(0.00075, gridAmount * gridNumber));
+        GridModel gridModel = new GridModel("grid-01", gridNumber, gridAmount, btcSymbol);
+        //手续费
+        double feeRate = 0.00075;
+        TradeContext tradeContext = new TradeContext(new AccountModel(feeRate, gridAmount * gridNumber));
         gridModel.initTradeContext(tradeContext);
 
         new BarEngineBuilder<BaseBarExtend>()
