@@ -18,10 +18,7 @@
 
 package org.example.core.strategy.grid;
 
-import org.example.core.enums.OrderState;
-
 public class GridOrder {
-    //    private double feeRate = 0.00075;
     //这是第几个单子
     private int sequnce;
     //触发价格买入
@@ -35,7 +32,7 @@ public class GridOrder {
     //需要卖出的数量
     private double quantity;
 
-    //0canBug  1交易中 2canSell
+    //0canBuy  1交易中 2canSell
     private int status;
 
     private long lastBuyUpdateTime;

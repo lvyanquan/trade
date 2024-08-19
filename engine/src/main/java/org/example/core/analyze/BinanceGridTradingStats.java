@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example.core.order.analyze;
+package org.example.core.analyze;
 
 import com.binance.connector.client.impl.spot.Trade;
 import org.example.core.enums.OrderState;

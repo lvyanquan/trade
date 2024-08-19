@@ -20,12 +20,11 @@ package org.example.core.bar;
 
 import com.binance.connector.client.impl.SpotClientImpl;
 import com.binance.connector.client.impl.spot.Trade;
-import com.google.common.collect.Lists;
 import org.example.core.Constant;
 import org.example.core.order.BaseOrder;
 import org.example.core.order.OrderManager;
-import org.example.core.order.analyze.BinanceGridTradingStats;
-import org.example.core.order.analyze.GridTradeAnalysis;
+import org.example.core.analyze.BinanceGridTradingStats;
+import org.example.core.analyze.GridTradeAnalysis;
 import org.example.core.strategy.JdbcTest;
 import org.junit.Test;
 
@@ -56,7 +55,7 @@ public class TradeRecordTest {
     public void analyzeAllOrder() {
         // 从数据库加载数据，并创建 BaseOrder 和 Trade 实例列表
         //加上一个时间戳
-        long startTime = System.currentTimeMillis() - 74 * 60 * 60 * 1000;
+        long startTime = System.currentTimeMillis() - 5 * 24  * 60 * 60 * 1000;
         long endTime = System.currentTimeMillis();
 
         List<BaseOrder> orders = JdbcTest.findAllOrder("BTCUSDT", startTime, endTime);

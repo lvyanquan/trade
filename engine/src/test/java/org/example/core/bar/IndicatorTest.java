@@ -72,8 +72,8 @@ public class IndicatorTest {
             double min = Long.MAX_VALUE;
             double averg = 0;
             double tempSum = 0;
-            int barCount = 200;
-            for (int i = value.getBarSeries().getEndIndex() - barCount; i < value.getBarSeries().getEndIndex(); i++) {
+            int barCount = value.getBarSeries().getEndIndex() - value.getBarSeries().getBeginIndex();
+            for (int i = value.getBarSeries().getBeginIndex(); i < value.getBarSeries().getEndIndex(); i++) {
                 double v = value.getValue(i).doubleValue();
                 max = Math.max(max, v);
                 min = Math.min(min, v);
@@ -108,7 +108,8 @@ public class IndicatorTest {
             @Override
             public void open() {
                 baseBarSeries = new BaseBarSeries(symbol, DoubleNum::valueOf);
-                atrRatioIndicator = new AtrRatioIndicator(new ClosePriceIndicator(baseBarSeries), new ATRIndicator(baseBarSeries, 30));
+                //15分钟级别的交易，用最近48个小时的atr值做判断
+                atrRatioIndicator = new AtrRatioIndicator(new ClosePriceIndicator(baseBarSeries), new ATRIndicator(baseBarSeries, 48 * 4));
                 mpas.put(symbol, atrRatioIndicator);
             }
 

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.example.core.order.analyze;
+package org.example.core.analyze;
 
 import org.example.core.enums.Side;
 import org.example.core.order.BaseOrder;
@@ -83,8 +83,10 @@ public class GridTradeAnalysis {
 
         for (BaseOrder order : orders) {
             if (order.getSide().equals(Side.BUY)) {
-                buyOrder = order;
-            } else if (order.getSide().equals(Side.SELL) && buyOrder != null) {
+                if (order.getStatus().isTrade()) {
+                    buyOrder = order;
+                }
+            } else if (order.getStatus().isTrade() && order.getSide().equals(Side.SELL) && buyOrder != null) {
                 // 匹配成功，计算利润和净利润
                 BigDecimal profit = order.getCummulativeQuoteQty().subtract(buyOrder.getCummulativeQuoteQty());
                 BigDecimal netProfit = profit.subtract(commition).subtract(commition);
