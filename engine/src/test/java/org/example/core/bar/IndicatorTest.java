@@ -69,16 +69,17 @@ public class IndicatorTest {
         for (Map.Entry<String, AtrRatioIndicator> entry : mpas.entrySet()) {
             AtrRatioIndicator value = entry.getValue();
             double max = 0;
-            double min = 1;
+            double min = Long.MAX_VALUE;
             double averg = 0;
             double tempSum = 0;
-            for (int i = value.getBarSeries().getEndIndex() - 200; i < value.getBarSeries().getEndIndex(); i++) {
+            int barCount = 200;
+            for (int i = value.getBarSeries().getEndIndex() - barCount; i < value.getBarSeries().getEndIndex(); i++) {
                 double v = value.getValue(i).doubleValue();
                 max = Math.max(max, v);
                 min = Math.min(min, v);
                 tempSum += v;
             }
-            averg = tempSum / 200;
+            averg = tempSum / barCount;
             rows.add(new String[]{entry.getKey(), String.valueOf(min), String.valueOf(max), String.valueOf(averg)});
         }
         String[] fields = new String[4];
