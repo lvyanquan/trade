@@ -1,3 +1,5 @@
+create database if not exists trade;
+
 create table trade.binance_orders
 (
     order_id                   bigint unsigned                   not null comment '订单的唯一标识符，由 Binance 分配'
@@ -57,4 +59,32 @@ create index idx_order_id
 
 create index idx_symbol
     on trade.binance_trades (symbol);
+
+create table trade.grid
+(
+    name         varchar(255) not null
+        primary key,
+    centralPrice double       not null,
+    gridAmount   double       not null,
+    gridNumber   int          not null,
+    updateTime   datetime     not null
+);
+
+create table trade.virtualOrder
+(
+    id               varchar(255)     not null
+        primary key,
+    symbol           varchar(255)     null,
+    gridIndex        int              not null,
+    price            double           not null,
+    quantity         double           not null,
+    executedQuantity double default 0 null,
+    avgPrice         double default 0 null,
+    side             int              not null comment ' 0 买入做多 1买入做空 2 卖多单 3卖空单
+
+',
+    status           int              not null,
+    updateTime       bigint           null comment '最近更新时间'
+);
+
 
