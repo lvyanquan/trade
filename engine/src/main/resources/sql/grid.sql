@@ -21,6 +21,7 @@ create table trade.virtualOrder
     side             int              not null comment ' 0 买入做多 1买入做空 2 卖多单 3卖空单
 
 ',
-    status           int              not null
+    status           int              not null,
+    updateTime       bigint           null comment '最近更新时间'
 );
 
