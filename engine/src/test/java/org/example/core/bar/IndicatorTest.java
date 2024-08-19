@@ -20,6 +20,7 @@ package org.example.core.bar;
 
 import org.example.core.bar.util.BarConvent;
 import org.example.core.indicator.ta4j.AtrRatioIndicator;
+import org.example.core.util.TablePrintUtil;
 import org.junit.Test;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BaseBarSeries;
@@ -30,6 +31,7 @@ import org.ta4j.core.num.DoubleNum;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -63,9 +65,7 @@ public class IndicatorTest {
         binance.build()
                 .run();
 
-        StringBuilder stringBuilder = new StringBuilder().append("币种              最低值                   最高值                       平均值\n");
-
-        String template = "%s    %s      %s        %s\n";
+        ArrayList<String[]> rows = new ArrayList<>();
         for (Map.Entry<String, AtrRatioIndicator> entry : mpas.entrySet()) {
             AtrRatioIndicator value = entry.getValue();
             double max = 0;
@@ -79,9 +79,15 @@ public class IndicatorTest {
                 tempSum += v;
             }
             averg = tempSum / 200;
-            stringBuilder.append(String.format( template, entry.getKey(), min, max, averg));
+            rows.add(new String[]{entry.getKey(), String.valueOf(min), String.valueOf(max), String.valueOf(averg)});
         }
-        System.out.println(stringBuilder.toString());
+        String[] fields = new String[4];
+        fields[0] = "币种";
+        fields[1] = "最低值";
+        fields[2] = "最高值";
+        fields[3] = "平均值";
+        TablePrintUtil.printTable(rows, fields);
+
         // 过滤出波动率较大的交易对，假设波动率大于0.02
 //        double threshold = 0.02;
 //        Map<String, AtrRatioIndicator> highVolatilityPairs = mpas.entrySet().stream()
